@@ -5,7 +5,7 @@ fn main() {
     // TODO probably this forcefield is supposed to be a reference and not
     // separate clones, but we'll see
     let objective = Objective::new(forcefield.clone());
-    let optimizer = Optimizer::new(objective, forcefield);
+    let mut optimizer = Optimizer::new(objective, forcefield);
 
     optimizer.run();
 }
