@@ -1,15 +1,25 @@
 //! Rust version of the optimization package ForceBalance
 
+#[allow(unused)]
 pub mod forcefield {
     #[derive(Clone)]
     pub struct FF {
         /// The total number of parameters.
         pub(crate) np: usize,
+
+        pub(crate) use_pvals: bool,
     }
 
     impl FF {
         pub fn new() -> Self {
-            FF { np: 0 }
+            FF {
+                np: 0,
+                use_pvals: todo!(),
+            }
+        }
+
+        pub(crate) fn create_mvals(&self, vals: Vec<f64>) -> Vec<f64> {
+            todo!()
         }
     }
 
@@ -26,11 +36,51 @@ pub mod objective {
 
     pub(crate) struct Target {
         pub(crate) good_step: bool,
+
+        /// current step size for finite differences
+        pub(crate) h: f64,
+    }
+
+    #[derive(Default)]
+    pub struct Regularization {
+        w: f64,
+        x: f64,
+    }
+
+    impl Regularization {
+        pub fn new(w: f64, x: f64) -> Self {
+            Self { w, x }
+        }
+    }
+
+    struct Extra(f64, Vec<f64>, Vec<f64>);
+
+    struct Penalty;
+
+    impl Penalty {
+        fn compute(&self, vals: Vec<f64>, objective: &mut ObjMap) -> Extra {
+            todo!()
+        }
     }
 
     pub struct Objective {
         forcefield: FF,
         pub(crate) targets: Vec<Target>,
+
+        /// in Python this is an entry in the ObjDict map. TODO consider making
+        /// it an Option depending on how it's used
+        regularization: Regularization,
+
+        penalty: Penalty,
+    }
+
+    pub(crate) struct ObjMap {
+        pub(crate) x0: f64,
+        pub(crate) g0: Vec<f64>,
+        pub(crate) h0: Vec<f64>,
+        pub(crate) x: f64,
+        pub(crate) g: Vec<f64>,
+        pub(crate) h: Vec<f64>,
     }
 
     impl Objective {
@@ -38,14 +88,57 @@ pub mod objective {
             Self {
                 forcefield,
                 targets: Vec::new(),
+                regularization: Default::default(),
+                penalty: Penalty,
             }
+        }
+
+        pub(crate) fn full(&mut self, vals: Vec<f64>, order: i32) -> ObjMap {
+            // TODO borrow here if it doesn't get consumed
+            let mut objective = self.target_terms(vals.clone(), order);
+            let extra = if self.forcefield.use_pvals {
+                self.penalty
+                    .compute(self.forcefield.create_mvals(vals), &mut objective)
+            } else {
+                self.penalty.compute(vals, &mut objective)
+            };
+            objective.x0 = objective.x;
+            objective.g0 = objective.g.clone();
+            objective.h0 = objective.h.clone();
+
+            // TODO figure out how to obtain this. going to have to keep track
+            // of it on one of these structs or maybe just set a global static
+            // (...) we're definitely not going to examine the stack trace of
+            // the program like the python version..........
+            let in_finite_difference = false;
+            if !in_finite_difference {
+                self.regularization = Regularization::new(1.0, extra.0);
+            }
+
+            objective.x += extra.0;
+            // TODO just use + if I switch to some kind of array package
+            for (i, g) in objective.g.iter_mut().enumerate() {
+                *g += extra.1[i];
+            }
+            for (i, h) in objective.h.iter_mut().enumerate() {
+                *h += extra.2[i];
+            }
+
+            objective
+        }
+
+        fn target_terms(&self, vals: Vec<f64>, order: i32) -> ObjMap {
+            todo!()
         }
     }
 }
 
 #[allow(unused)]
 pub mod optimizer {
-    use crate::{forcefield::FF, objective::Objective};
+    use crate::{
+        forcefield::FF,
+        objective::{ObjMap, Objective},
+    };
 
     /// a struct representing all possible convergence criteria
     struct Criteria {
@@ -72,6 +165,15 @@ pub mod optimizer {
         adapt_fac: f64,
         mvals0: Vec<f64>,
 
+        /// initial step size for numerical finite difference
+        h0: f64,
+
+        /// current step size for numerical finite difference
+        h: f64,
+
+        /// finite difference factor
+        fdf: f64,
+
         uncert: bool,
         convergence_objective: f64,
 
@@ -92,6 +194,9 @@ pub mod optimizer {
                 iteration: 0,
                 good_step: false,
                 mvals0: todo!(),
+                h0: todo!(),
+                h: todo!(),
+                fdf: todo!(),
             }
         }
 
@@ -124,7 +229,7 @@ pub mod optimizer {
         /// size tolerance is reached.
         ///
         /// `bfgs` switches between BFGS (`true`) or Newton-Raphson (`false`)
-        fn main_optimizer(&mut self, bfgs: bool) {
+        fn main_optimizer(&mut self, bfgs: bool) -> ! {
             if self.trust0 < 0.0 {
                 todo!("hessian diagonal search")
             } else if self.adapt_fac != 0.0 {
@@ -172,12 +277,35 @@ pub mod optimizer {
             let criteria_satisfied = Criteria::new();
 
             // non-linear iterations
+            loop {
+                let using_checkpoint = false;
+                let (x, g, h) = if using_checkpoint {
+                    todo!();
+                } else {
+                    self.adjh(trust);
+                    let ObjMap { x, g, h, .. } = self.objective.full(xk, ord);
+                    (x, g, h)
+                };
+            }
         }
 
         pub fn set_good_step(&mut self, good_step: bool) {
             self.good_step = good_step;
             for target in self.objective.targets.iter_mut() {
                 target.good_step = good_step;
+            }
+        }
+
+        fn adjh(&mut self, trust: f64) {
+            // the finite difference step size should be at most 1% of the trust
+            // radius
+            let h = f64::min(self.fdf * trust, self.h0);
+            if h != self.h {
+                // setting finite difference step size
+                self.h = h;
+                for target in self.objective.targets.iter_mut() {
+                    target.h = h;
+                }
             }
         }
     }
