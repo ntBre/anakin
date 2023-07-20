@@ -12,8 +12,15 @@ pub mod forcefield {
             FF { np: 0 }
         }
     }
+
+    impl Default for FF {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
 }
 
+#[allow(unused)]
 pub mod objective {
     use crate::forcefield::FF;
 
