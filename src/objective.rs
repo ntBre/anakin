@@ -1,13 +1,49 @@
-use crate::forcefield::FF;
+use std::collections::HashMap;
+
+use crate::{forcefield::FF, work_queue::WorkQueue, Dmat, Dvec};
+
+use self::penalty::Penalty;
+
+mod penalty;
 
 pub(crate) struct Target {
     pub(crate) good_step: bool,
 
     /// current step size for finite differences
     pub(crate) h: f64,
+
+    /// bsave in Python but I think the b means bool..
+    save: bool,
+
+    name: String,
+
+    weight: f64,
+
+    evaluated: bool,
+}
+
+impl Target {
+    fn stage(&self, mvals: Vec<f64>, order_1: bool, order_2: bool) {
+        todo!()
+    }
+
+    fn get_x(&self, mvals: Vec<f64>) -> ! {
+        todo!()
+    }
+
+    fn get_g(&self, mvals: Vec<f64>) -> ! {
+        todo!()
+    }
+
+    fn get_h(&self, mvals: Vec<f64>) -> ! {
+        todo!()
+    }
 }
 
 #[derive(Default)]
+// TODO consider renaming this once I figure out what it's supposed to be. only
+// one instance of it is called regularization. other times we're associating
+// target names with it
 pub struct Regularization {
     w: f64,
     x: f64,
@@ -19,15 +55,7 @@ impl Regularization {
     }
 }
 
-struct Extra(f64, Vec<f64>, Vec<f64>);
-
-struct Penalty;
-
-impl Penalty {
-    fn compute(&self, vals: Vec<f64>, objective: &mut ObjMap) -> Extra {
-        todo!()
-    }
-}
+pub(crate) struct Extra(f64, Dvec, Dmat);
 
 pub struct Objective {
     forcefield: FF,
@@ -35,18 +63,51 @@ pub struct Objective {
 
     /// in Python this is an entry in the ObjDict map. TODO consider making
     /// it an Option depending on how it's used
-    regularization: Regularization,
+    obj_map: HashMap<String, Regularization>,
 
     penalty: Penalty,
+
+    // I might never use this
+    asynchronous: bool,
+
+    /// assuming this means total weight
+    wtot: f64,
 }
 
 pub(crate) struct ObjMap {
     pub(crate) x0: f64,
-    pub(crate) g0: Vec<f64>,
-    pub(crate) h0: Vec<f64>,
+    pub(crate) g0: Dvec,
+    pub(crate) h0: Dmat,
+
+    /// objective function value
     pub(crate) x: f64,
-    pub(crate) g: Vec<f64>,
-    pub(crate) h: Vec<f64>,
+
+    /// objective function first derivative
+    pub(crate) g: Dvec,
+
+    /// objective function second derivative
+    pub(crate) h: Dmat,
+}
+
+impl ObjMap {
+    fn zeros(size: usize) -> Self {
+        Self {
+            x0: 0.0,
+            g0: Dvec::zeros(size),
+            h0: Dmat::zeros(size, size),
+            x: 0.0,
+            g: Dvec::zeros(size),
+            h: Dmat::zeros(size, size),
+        }
+    }
+}
+
+// TODO figure out how to obtain this. going to have to keep track of it on one
+// of these structs or maybe just set a global static (...) we're definitely not
+// going to examine the stack trace of the program like the python
+// version..........
+fn in_fd() -> bool {
+    false
 }
 
 impl Objective {
@@ -54,8 +115,10 @@ impl Objective {
         Self {
             forcefield,
             targets: Vec::new(),
-            regularization: Default::default(),
-            penalty: Penalty,
+            obj_map: HashMap::new(),
+            penalty: Penalty::default(), // TODO from config
+            asynchronous: false,
+            wtot: 1.0, // TODO should be some of weights from targets
         }
     }
 
@@ -72,28 +135,65 @@ impl Objective {
         objective.g0 = objective.g.clone();
         objective.h0 = objective.h.clone();
 
-        // TODO figure out how to obtain this. going to have to keep track
-        // of it on one of these structs or maybe just set a global static
-        // (...) we're definitely not going to examine the stack trace of
-        // the program like the python version..........
-        let in_finite_difference = false;
-        if !in_finite_difference {
-            self.regularization = Regularization::new(1.0, extra.0);
+        if !in_fd() {
+            self.obj_map.insert(
+                "Regularization".to_owned(),
+                Regularization::new(1.0, extra.0),
+            );
         }
 
         objective.x += extra.0;
-        // TODO just use + if I switch to some kind of array package
-        for (i, g) in objective.g.iter_mut().enumerate() {
-            *g += extra.1[i];
-        }
-        for (i, h) in objective.h.iter_mut().enumerate() {
-            *h += extra.2[i];
-        }
+        objective.g += extra.1;
+        objective.h += extra.2;
 
         objective
     }
 
-    fn target_terms(&self, vals: Vec<f64>, order: i32) -> ObjMap {
-        todo!()
+    fn target_terms(&mut self, mvals: Vec<f64>, order: i32) -> ObjMap {
+        let mut objective = ObjMap::zeros(self.forcefield.np);
+        for tgt in &self.targets {
+            // TODO consider borrowing
+            tgt.stage(mvals.clone(), order >= 1, order >= 2);
+        }
+
+        if self.asynchronous {
+            todo!();
+        } else {
+            // TODO might be supposed to use an existing work queue. see
+            // nifty/getWorkQueue at some point. this might even be a psqs
+            // situation.
+            let wq = WorkQueue::new();
+            for tgt in self.targets.iter_mut() {
+                tgt.save = true;
+                let ans: Extra = match order {
+                    0 => tgt.get_x(mvals),
+                    1 => tgt.get_g(mvals),
+                    2 => tgt.get_h(mvals),
+                    _ => unimplemented!(),
+                };
+                if !in_fd() {
+                    self.obj_map.insert(
+                        tgt.name,
+                        Regularization::new(tgt.weight / self.wtot, ans.0),
+                    );
+                }
+                objective.x += ans.0 * tgt.weight / self.wtot;
+                objective.g += ans.1 * tgt.weight / self.wtot;
+                objective.h += ans.2 * tgt.weight / self.wtot;
+            }
+        }
+
+        for tgt in self.targets.iter_mut() {
+            tgt.evaluated = true;
+        }
+
+        // prevent exact zeros on Hessian diagonal
+        for i in 0..self.forcefield.np {
+            if objective.h[(i, i)] == 0.0 {
+                objective.h[(i, i)] = 1.0;
+            }
+        }
+
+        objective
     }
 }

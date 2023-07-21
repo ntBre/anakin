@@ -37,7 +37,11 @@ pub struct Optimizer {
     /// finite difference factor
     fdf: f64,
 
+    /// Some target types (looks like liquid, lipid, and thermo) introduce
+    /// uncertainty into the objective function, necessitating re-evaluation of
+    /// the objective function when a step is rejected.
     uncert: bool,
+
     convergence_objective: f64,
 
     iteration: usize,
@@ -50,16 +54,19 @@ impl Optimizer {
         Self {
             objective,
             forcefield,
-            trust0: todo!(),
-            adapt_fac: todo!(),
-            uncert: todo!(),
-            convergence_objective: todo!(),
+            /// TODO take these from config file. I'm taking default values from
+            /// the config file produced by the example script. maybe these
+            /// should be on Optimizer::default
+            trust0: 0.1,
+            adapt_fac: 0.25,
+            uncert: false,
+            convergence_objective: 1e-4,
             iteration: 0,
             good_step: false,
-            mvals0: todo!(),
-            h0: todo!(),
-            h: todo!(),
-            fdf: todo!(),
+            mvals0: Vec::new(), // TODO option? or empty vector enough
+            h0: 0.001,          // taken from finite_difference_h config
+            h: 0.001,
+            fdf: 0.1,
         }
     }
 
@@ -93,13 +100,15 @@ impl Optimizer {
     ///
     /// `bfgs` switches between BFGS (`true`) or Newton-Raphson (`false`)
     fn main_optimizer(&mut self, bfgs: bool) -> ! {
-        if self.trust0 < 0.0 {
-            todo!("hessian diagonal search")
+        // this is only for printing
+        let detail = if self.trust0 < 0.0 {
+            "hessian diagonal search"
         } else if self.adapt_fac != 0.0 {
-            todo!("adaptive trust radius")
+            "adaptive trust radius"
         } else {
-            todo!("trust radius")
-        }
+            "trust radius"
+        };
+        eprintln!("{detail}");
 
         // warn if optimization is unlikely to converge
         if self.uncert && self.convergence_objective < 1e-3 {
@@ -146,7 +155,10 @@ impl Optimizer {
                 todo!();
             } else {
                 self.adjh(trust);
-                let ObjMap { x, g, h, .. } = self.objective.full(xk, ord);
+                // TODO see if xk can be borrowed here. it might even need to be
+                // mutated?
+                let ObjMap { x, g, h, .. } =
+                    self.objective.full(xk.clone(), ord);
                 (x, g, h)
             };
         }
