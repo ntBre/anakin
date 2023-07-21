@@ -48,8 +48,16 @@ pub struct Optimizer {
     uncert: bool,
 
     convergence_objective: f64,
+
+    /// (float) Convergence criterion of gradient norm used in: Main Optimizer
     convergence_gradient: f64,
+
+    /// (float) Convergence criterion of step size (just needs to fall below
+    /// this threshold) used in: Main Optimizer
     convergence_step: f64,
+
+    /// (int) The number of convergence criteria that must be met for main
+    /// optimizer to converge used in: Main Optimizer
     criteria: usize,
 
     iteration: usize,
@@ -78,8 +86,11 @@ pub struct Optimizer {
 
     hist: usize,
 
+    /// (bool) Allow convergence on "low quality" steps
     converge_lowq: bool,
 
+    /// (float) Optimization will "fail" if step falls below this size used in:
+    /// Main Optimizer
     step_lowerbound: f64,
 }
 
@@ -107,11 +118,11 @@ impl Optimizer {
             maxstep: 100,
             adapt_damp: 0.5,
             hist: 0,
-            converge_lowq: todo!(),
-            convergence_gradient: todo!(),
-            convergence_step: todo!(),
-            criteria: todo!(),
-            step_lowerbound: todo!(),
+            converge_lowq: false,
+            convergence_gradient: 1e-3,
+            convergence_step: 1e-4,
+            criteria: 1,
+            step_lowerbound: 1e-6,
         }
     }
 
