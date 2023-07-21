@@ -144,15 +144,7 @@ impl Optimizer {
     /// size tolerance is reached.
     ///
     /// `bfgs` switches between BFGS (`true`) or Newton-Raphson (`false`)
-    fn main_optimizer(
-        &mut self,
-        bfgs: bool,
-    ) -> nalgebra::Matrix<
-        f64,
-        nalgebra::Dyn,
-        nalgebra::Const<1>,
-        nalgebra::VecStorage<f64, nalgebra::Dyn, nalgebra::Const<1>>,
-    > {
+    fn main_optimizer(&mut self, bfgs: bool) -> Dvec {
         // this is only for printing
         let detail = if self.trust0 < 0.0 {
             "hessian diagonal search"
@@ -260,8 +252,11 @@ impl Optimizer {
                         // TODO write a checkpoint
 
                         if self.iteration == self.maxstep {
-                            eprintln!("Maximum number of optimization steps reached ({})",
-				      self.iteration);
+                            eprintln!(
+                                "Maximum number of optimization steps \
+				       reached ({})",
+                                self.iteration
+                            );
                             break;
                         }
 
@@ -468,17 +463,7 @@ impl Optimizer {
         }
     }
 
-    fn step(
-        &self,
-        xk: nalgebra::Matrix<
-            f64,
-            nalgebra::Dyn,
-            nalgebra::Const<1>,
-            nalgebra::VecStorage<f64, nalgebra::Dyn, nalgebra::Const<1>>,
-        >,
-        data: ObjMap,
-        trust: f64,
-    ) -> (Dvec, f64, bool) {
+    fn step(&self, xk: Dvec, data: ObjMap, trust: f64) -> (Dvec, f64, bool) {
         todo!()
     }
 }
