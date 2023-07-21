@@ -1,6 +1,7 @@
 use crate::{
     forcefield::FF,
     objective::{ObjMap, Objective},
+    utils::std_dev,
     Dmat, Dvec,
 };
 
@@ -477,8 +478,4 @@ impl Optimizer {
     fn step(&self, xk: Dvec, data: ObjMap, trust: f64) -> (Dvec, f64, bool) {
         todo!()
     }
-}
-
-fn std_dev(hist: &[f64]) -> f64 {
-    todo!()
 }
