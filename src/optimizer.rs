@@ -365,31 +365,15 @@ impl Optimizer {
                 || (self.converge_lowq || quality > threlq)
                 || (self.iteration == self.iter_init && self.iter_init > 0)
             {
-                // TODO assign to comparison directly. let's see if new clippy
-                // catches this after other errors are resolved
-                if ngd < self.convergence_gradient {
-                    criteria_satisfied.grad = true;
-                } else {
-                    criteria_satisfied.grad = false;
-                }
+                criteria_satisfied.grad = ngd < self.convergence_gradient;
 
                 // TODO comparison assign
-                if ndx < self.convergence_step
+                criteria_satisfied.step = ndx < self.convergence_step
                     && ndx >= 0.0
-                    && self.iteration > self.iter_init
-                {
-                    criteria_satisfied.step = true;
-                } else {
-                    criteria_satisfied.step = false;
-                }
+                    && self.iteration > self.iter_init;
 
-                if stdfront < self.convergence_objective
-                    && x_hist.len() > self.hist
-                {
-                    criteria_satisfied.obj = true;
-                } else {
-                    criteria_satisfied.obj = false;
-                }
+                criteria_satisfied.obj = stdfront < self.convergence_objective
+                    && x_hist.len() > self.hist;
             }
             if criteria_satisfied.sum() >= self.criteria {
                 break;
@@ -418,14 +402,9 @@ impl Optimizer {
                 || (self.converge_lowq || quality > threlq)
                 || (self.iteration == self.iter_init && self.iter_init > 0)
             {
-                if ndx < self.convergence_step
+                criteria_satisfied.step = ndx < self.convergence_step
                     && ndx >= 0.0
-                    && self.iteration > self.iter_init
-                {
-                    criteria_satisfied.step = true;
-                } else {
-                    criteria_satisfied.step = false;
-                }
+                    && self.iteration > self.iter_init;
             }
             if criteria_satisfied.sum() >= self.criteria {
                 break;
