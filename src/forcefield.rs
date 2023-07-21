@@ -17,6 +17,9 @@ pub struct FF {
     pvals0: Dvec,
 
     plist: Vec<String>,
+
+    /// indices to be excluded from the Hessian update
+    pub(crate) excision: Vec<usize>,
 }
 
 impl FF {
@@ -27,6 +30,7 @@ impl FF {
             tmi: Dmat::zeros(0, 0),
             pvals0: Dvec::zeros(0),
             plist: Vec::new(),
+            excision: Vec::new(),
         }
     }
 

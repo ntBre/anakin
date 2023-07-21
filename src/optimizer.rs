@@ -1,9 +1,14 @@
+use nalgebra::SVD;
+
 use crate::{
     forcefield::FF,
-    objective::{ObjMap, Objective},
-    utils::std_dev,
+    objective::{penalty::PenaltyType, ObjMap, Objective},
+    optimizer::solvers::{hyper_solver, para_solver},
+    utils::{invert_svd, std_dev},
     Dmat, Dvec,
 };
+
+mod solvers;
 
 /// a struct representing all possible convergence criteria
 struct Criteria {
@@ -93,6 +98,8 @@ pub struct Optimizer {
     /// (float) Optimization will "fail" if step falls below this size used in:
     /// Main Optimizer
     step_lowerbound: f64,
+
+    eps: f64,
 }
 
 impl Optimizer {
@@ -124,6 +131,7 @@ impl Optimizer {
             convergence_step: 1e-4,
             criteria: 1,
             step_lowerbound: 1e-6,
+            eps: 1e-4, // eig_lowerbound
         }
     }
 
@@ -476,6 +484,80 @@ impl Optimizer {
     }
 
     fn step(&self, xk: Dvec, data: ObjMap, trust: f64) -> (Dvec, f64, bool) {
+        // TODO could be a field on `self` but doesnt seem necessary
+        let bhyp = !matches!(
+            self.objective.penalty.ptype,
+            PenaltyType::Parabolic | PenaltyType::Box
+        );
+
+        let (x, mut g, mut h) = if bhyp {
+            (data.x0, data.g0, data.h0)
+        } else {
+            (data.x, data.g, data.h)
+        };
+
+        let mut h1 = h.clone();
+        for x in &self.forcefield.excision {
+            h1 = h1.remove_row(*x);
+            h1 = h1.remove_column(*x);
+        }
+
+        let eig = h1.eigenvalues().unwrap();
+        let emin = eig.iter().min_by(|a, b| a.total_cmp(b)).unwrap();
+
+        if *emin < self.eps {
+            // mix in steepest descent step if Hessian minimum eigenvalue is
+            // negative (Experiment (???))
+            let adj = self.eps.max(0.01 * emin.abs()) - emin;
+            let (r, _) = h.shape();
+            h += adj * Dmat::identity(r, r);
+        }
+
+        let mut xkd = xk.clone();
+        if bhyp {
+            for x in &self.forcefield.excision {
+                g = g.remove_row(*x);
+                h1 = h1.remove_row(*x);
+                h1 = h1.remove_column(*x);
+                xkd = xkd.remove_row(*x);
+            }
+
+            // TODO a bunch of Hyper stuff
+            todo!()
+        } else {
+            let g0 = g.clone();
+            let h0 = h.clone();
+            for x in &self.forcefield.excision {
+                g = g.remove_row(*x);
+                h = h.remove_row(*x);
+                h = h.remove_column(*x);
+
+                let hi = invert_svd(h.clone());
+                let mut dx = -1.0 * hi * &g;
+
+                for i in &self.forcefield.excision {
+                    dx = dx.insert_row(*i, 0.0);
+                }
+            }
+        }
+
+        let solver = if bhyp { hyper_solver } else { para_solver };
+
+        // TODO counting micro iterations
+
+        if self.trust0 > 0.0 {
+            let mut bump = false;
+            let (dx, expect) = solver(1);
+            let dxnorm = dx.norm();
+            if dxnorm > trust {
+                bump = true;
+                // Tried a few optimizers here, seems like Brent works well.
+                // Okay, the problem with Brent is that the tolerance is
+                // fractional. If the optimized value is zero, then it takes a
+                // lot of meaningless steps.
+                todo!("implement scipy.optimize.brent");
+            }
+        }
         todo!()
     }
 }

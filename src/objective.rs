@@ -4,7 +4,7 @@ use crate::{forcefield::FF, work_queue::WorkQueue, Dmat, Dvec};
 
 use self::penalty::Penalty;
 
-mod penalty;
+pub(crate) mod penalty;
 
 pub(crate) struct Target {
     pub(crate) good_step: bool,
@@ -65,7 +65,7 @@ pub struct Objective {
     /// it an Option depending on how it's used
     obj_map: HashMap<String, Regularization>,
 
-    penalty: Penalty,
+    pub(crate) penalty: Penalty,
 
     // I might never use this
     asynchronous: bool,

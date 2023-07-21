@@ -46,7 +46,7 @@ use super::{Extra, ObjMap};
 
 #[derive(Default)]
 #[repr(u8)]
-enum PenaltyType {
+pub(crate) enum PenaltyType {
     // TODO serde alias this to hyp, hyper, l1, and hyperbola if I end up
     // loading straight from file. otherwise I might need to break all of those
     // (and change the repr) out if they are used differently later on
@@ -73,7 +73,7 @@ pub(crate) struct Penalty {
     b: f64,
     p: f64,
     ff: FF,
-    ptype: PenaltyType,
+    pub(crate) ptype: PenaltyType,
     // spacings: HashMap?
 }
 
