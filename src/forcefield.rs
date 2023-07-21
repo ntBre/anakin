@@ -1,3 +1,5 @@
+use crate::Dvec;
+
 #[derive(Clone)]
 pub struct FF {
     /// The total number of parameters.
@@ -17,7 +19,11 @@ impl FF {
         }
     }
 
-    pub(crate) fn create_mvals(&self, vals: Vec<f64>) -> Vec<f64> {
+    pub(crate) fn create_mvals(&self, vals: Dvec) -> Dvec {
+        todo!()
+    }
+
+    pub(crate) fn create_pvals(&self, xk: Dvec) -> Dvec {
         todo!()
     }
 }

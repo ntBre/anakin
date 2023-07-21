@@ -23,19 +23,19 @@ pub(crate) struct Target {
 }
 
 impl Target {
-    fn stage(&self, mvals: Vec<f64>, order_1: bool, order_2: bool) {
+    fn stage(&self, mvals: Dvec, order_1: bool, order_2: bool) {
         todo!()
     }
 
-    fn get_x(&self, mvals: Vec<f64>) -> ! {
+    fn get_x(&self, mvals: Dvec) -> ! {
         todo!()
     }
 
-    fn get_g(&self, mvals: Vec<f64>) -> ! {
+    fn get_g(&self, mvals: Dvec) -> ! {
         todo!()
     }
 
-    fn get_h(&self, mvals: Vec<f64>) -> ! {
+    fn get_h(&self, mvals: Dvec) -> ! {
         todo!()
     }
 }
@@ -74,6 +74,7 @@ pub struct Objective {
     wtot: f64,
 }
 
+#[derive(Clone)]
 pub(crate) struct ObjMap {
     pub(crate) x0: f64,
     pub(crate) g0: Dvec,
@@ -90,7 +91,7 @@ pub(crate) struct ObjMap {
 }
 
 impl ObjMap {
-    fn zeros(size: usize) -> Self {
+    pub(crate) fn zeros(size: usize) -> Self {
         Self {
             x0: 0.0,
             g0: Dvec::zeros(size),
@@ -122,7 +123,7 @@ impl Objective {
         }
     }
 
-    pub(crate) fn full(&mut self, vals: Vec<f64>, order: i32) -> ObjMap {
+    pub(crate) fn full(&mut self, vals: Dvec, order: i32) -> ObjMap {
         // TODO borrow here if it doesn't get consumed
         let mut objective = self.target_terms(vals.clone(), order);
         let extra = if self.forcefield.use_pvals {
@@ -149,7 +150,7 @@ impl Objective {
         objective
     }
 
-    fn target_terms(&mut self, mvals: Vec<f64>, order: i32) -> ObjMap {
+    fn target_terms(&mut self, mvals: Dvec, order: i32) -> ObjMap {
         let mut objective = ObjMap::zeros(self.forcefield.np);
         for tgt in &self.targets {
             // TODO consider borrowing
