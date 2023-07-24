@@ -80,7 +80,16 @@ impl FF {
 }
 
 impl Default for FF {
+    // TODO I'm not really sure this makes sense to have. see where it's being
+    // used and if we can/need to use something else
     fn default() -> Self {
-        todo!()
+        Self {
+            np: 0,
+            use_pvals: false,
+            tmi: Dmat::zeros(0, 0),
+            pvals0: Dvec::zeros(0),
+            plist: Vec::new(),
+            excision: Vec::new(),
+        }
     }
 }
