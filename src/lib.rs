@@ -12,6 +12,8 @@ pub mod objective;
 #[allow(unused)]
 pub mod optimizer;
 
+mod config;
+
 mod work_queue;
 
 mod utils {
