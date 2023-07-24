@@ -10,6 +10,8 @@ use crate::{
 
 mod solvers;
 
+mod optimize;
+
 /// a struct representing all possible convergence criteria
 struct Criteria {
     step: bool,
