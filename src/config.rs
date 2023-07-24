@@ -34,7 +34,7 @@ pub struct Config {
 
     /// Directory containing force fields, relative to project directory
     #[serde(default = "default_ffdir")]
-    ffdir: String,
+    pub(crate) ffdir: String,
 
     /// The AMOEBA polarization type, either direct, mutual, or nonpolarizable.
     amoeba_pol: Option<String>,
@@ -238,6 +238,10 @@ pub struct Config {
 
     /// The AMOEBA mutual polarization criterion.
     amoeba_eps: Option<f64>,
+
+    /// The names of force fields, corresponding to files
+    /// `forcefields/filename.ext`.
+    pub(crate) forcefield: Vec<String>,
 }
 
 impl Config {

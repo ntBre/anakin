@@ -20,6 +20,12 @@ pub struct FF {
 
     /// indices to be excluded from the Hessian update
     pub(crate) excision: Vec<usize>,
+
+    /// force field names
+    fnms: Vec<String>,
+
+    /// force field directory relative to the project directory
+    ffdir: String,
 }
 
 impl FF {
@@ -40,6 +46,8 @@ impl FF {
             pvals0,
             plist: Vec::new(),
             excision: Vec::new(),
+            fnms: config.forcefield.clone(),
+            ffdir: config.ffdir.clone(),
         }
     }
 
@@ -90,6 +98,8 @@ impl Default for FF {
             pvals0: Dvec::zeros(0),
             plist: Vec::new(),
             excision: Vec::new(),
+            fnms: Vec::new(),
+            ffdir: String::from("forcefield"),
         }
     }
 }
