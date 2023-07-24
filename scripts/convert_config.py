@@ -75,10 +75,34 @@ def build_bools():
         """
             )
 
+def build_floats():
+    for name, value in gen_opts_types["floats"].items():
+        (default, _priority, docs, *rest) = value
+        if default:
+            default_fn = f"default_{name}"
+            func = f"""fn {default_fn}() -> f64 {{
+        {default}
+            }}
+        """
+            default_funcs.append(func)
+            print(
+                f"""/// {docs}
+        #[serde(default = \"{default_fn}\")]
+        {name}: f64,
+        """
+            )
+        else:
+            print(
+                f"""/// {docs}
+        {name}: f64,
+        """
+            )
+
 
 build_strings()
 build_ints()
 build_bools()
+build_floats()
 
 for func in default_funcs:
     print(func)

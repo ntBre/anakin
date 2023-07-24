@@ -152,6 +152,92 @@ pub struct Config {
     /// Allow duplicate parameter names (only if you know what you are doing!
     #[serde(default)]
     duplicate_pnames: bool,
+
+    /// Levenberg-Marquardt trust radius; set to negative for nonlinear search
+    #[serde(default = "default_trust0")]
+    trust0: f64,
+
+    /// Minimum trust radius (if the trust radius is tiny, then noisy
+    /// optimizations become really gnarly)
+    mintrust: f64,
+
+    /// Convergence criterion of objective function (in MainOptimizer this is
+    /// the stdev of X2 over [objective_history] steps)
+    #[serde(default = "default_convergence_objective")]
+    convergence_objective: f64,
+
+    /// Convergence criterion of gradient norm
+    #[serde(default = "default_convergence_gradient")]
+    convergence_gradient: f64,
+
+    /// Convergence criterion of step size (just needs to fall below this
+    /// threshold)
+    #[serde(default = "default_convergence_step")]
+    convergence_step: f64,
+
+    /// Minimum eigenvalue for applying steepest descent correction
+    #[serde(default = "default_eig_lowerbound")]
+    eig_lowerbound: f64,
+
+    /// Optimization will "fail" if step falls below this size
+    #[serde(default = "default_step_lowerbound")]
+    step_lowerbound: f64,
+
+    /// Guess value for bracketing line search in trust radius algorithm
+    #[serde(default = "default_lm_guess")]
+    lm_guess: f64,
+
+    /// Step size for finite difference derivatives in many functions
+    #[serde(default = "default_finite_difference_h")]
+    finite_difference_h: f64,
+
+    /// Make sure that the finite difference step size does not exceed this
+    /// multiple of the trust radius.
+    #[serde(default = "default_finite_difference_factor")]
+    finite_difference_factor: f64,
+
+    /// Factor for additive penalty function in objective function
+    penalty_additive: f64,
+
+    /// Factor for multiplicative penalty function in objective function
+    #[serde(default)]
+    penalty_multiplicative: f64,
+
+    /// Extra parameter for fusion penalty function. Dictates position of log
+    /// barrier or L1-L0 switch distance
+    #[serde(default = "default_penalty_alpha")]
+    penalty_alpha: f64,
+
+    /// Cusp region for hyperbolic constraint; for x=0, the Hessian is a/2b
+    #[serde(default = "default_penalty_hyperbolic_b")]
+    penalty_hyperbolic_b: f64,
+
+    /// Power of the Euclidean norm of the parameter vector (default 2.0 is
+    /// normal L2 penalty)
+    #[serde(default = "default_penalty_power")]
+    penalty_power: f64,
+
+    /// The step size is increased / decreased by up to this much in the event
+    /// of a good / bad step; increase for a more variable step size.
+    #[serde(default = "default_adaptive_factor")]
+    adaptive_factor: f64,
+
+    /// Damping factor that ties down the trust radius to trust0; decrease for a
+    /// more variable step size.
+    #[serde(default = "default_adaptive_damping")]
+    adaptive_damping: f64,
+
+    /// Error tolerance; the optimizer will only reject steps that increase the
+    /// objective function by more than this number.
+    error_tolerance: f64,
+
+    /// Search tolerance; used only when trust radius is negative, dictates
+    /// convergence threshold of nonlinear search.
+    #[serde(default = "default_search_tolerance")]
+    search_tolerance: f64,
+
+    /// The AMOEBA mutual polarization criterion.
+    amoeba_eps: Option<f64>,
 }
 
 impl Config {
