@@ -1,4 +1,4 @@
-use crate::{Dmat, Dvec};
+use crate::{config::Config, Dmat, Dvec};
 
 #[derive(Clone)]
 pub struct FF {
@@ -23,12 +23,21 @@ pub struct FF {
 }
 
 impl FF {
-    pub fn new() -> Self {
+    pub fn new(config: &Config) -> Self {
+        // TODO clearly this is supposed to have some length
+        let pvals0 = Dvec::zeros(0);
+        // TODO real value here
+        let np = 0;
+        let rs = Dvec::from_element(pvals0.len(), 1.0);
+        let qmat2 = Dmat::identity(np, np);
+        // TODO qmat2 needs to be set for real
+        let transmat = qmat2 * Dmat::from_diagonal(&rs);
+        let tmi = transmat.transpose();
         FF {
-            np: 0,
-            use_pvals: false,
-            tmi: Dmat::zeros(0, 0),
-            pvals0: Dvec::zeros(0),
+            np,
+            use_pvals: config.use_pvals,
+            tmi,
+            pvals0,
             plist: Vec::new(),
             excision: Vec::new(),
         }
@@ -72,6 +81,6 @@ impl FF {
 
 impl Default for FF {
     fn default() -> Self {
-        Self::new()
+        todo!()
     }
 }

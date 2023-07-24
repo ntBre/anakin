@@ -1,40 +1,47 @@
+use std::{error::Error, fs::read_to_string, path::Path};
+
 use serde::Deserialize;
+
+mod default_fns;
+
+use default_fns::*;
 
 /// generated partially by `scripts/convert_config.py`
 #[derive(Deserialize)]
-struct Config {
+#[allow(unused)]
+pub struct Config {
     /// Path for GROMACS executables (if not the default)
-    gmxpath: String,
+    gmxpath: Option<String>,
 
     /// The suffix of GROMACS executables
-    gmxsuffix: String,
+    gmxsuffix: Option<String>,
 
     /// Path for TINKER executables (if not the default)
-    tinkerpath: String,
+    tinkerpath: Option<String>,
 
     /// Type of the penalty: L2, L1 or Box
     #[serde(default = "default_penalty_type")]
     penalty_type: String,
 
     /// Values to scan in the parameter space, given like this: -0.1:0.1:11
-    scan_vals: String,
+    scan_vals: Option<String>,
 
     /// Name of the restart file we read from
-    readchk: String,
+    readchk: Option<String>,
 
     /// Name of the restart file we write to (can be same as readchk)
-    writechk: String,
+    writechk: Option<String>,
 
     /// Directory containing force fields, relative to project directory
     #[serde(default = "default_ffdir")]
     ffdir: String,
 
     /// The AMOEBA polarization type, either direct, mutual, or nonpolarizable.
-    amoeba_pol: String,
+    amoeba_pol: Option<String>,
 
     /// Path to AMBER installation directory (leave blank to use AMBERHOME
     /// environment variable.
-    amberhome: String,
+    amberhome: Option<String>,
 
     /// Maximum number of steps in an optimization
     #[serde(default = "default_maxstep")]
@@ -54,7 +61,7 @@ struct Config {
     criteria: isize,
 
     /// Number of beads in ring polymer MD (zero to disable)
-    rpmd_beads: isize,
+    rpmd_beads: Option<isize>,
 
     /// Set to a nonnegative number to turn on zero gradient skipping at that
     /// optimization step.
@@ -74,10 +81,12 @@ struct Config {
     retain_micro_outputs: bool,
 
     /// Allow convergence on "low quality" steps
+    #[serde(default)]
     converge_lowq: bool,
 
     /// Specify whether there are virtual sites in the simulation (being fitted
     /// or not). Enforces calculation of vsite positions.
+    #[serde(default)]
     have_vsite: bool,
 
     /// Specify whether to constrain the charges on the molecules.
@@ -88,9 +97,11 @@ struct Config {
     print_gradient: bool,
 
     /// Optimize in the space of log-variables
+    #[serde(default)]
     logarithmic_map: bool,
 
     /// Print the objective function Hessian at every step
+    #[serde(default)]
     print_hessian: bool,
 
     /// Print the mathematical and physical parameters at every step
@@ -103,20 +114,25 @@ struct Config {
 
     /// Set to false to suppress printing options that are equal to their
     /// defaults
+    #[serde(default)]
     verbose_options: bool,
 
     /// Perform calculations using rigid water molecules.
+    #[serde(default)]
     rigid_water: bool,
 
     /// Perform calculations with contrained hydrogen bond lengths.
+    #[serde(default)]
     constrain_h: bool,
 
     /// Generate bonds from virtual sites to host atom bonded atoms.
+    #[serde(default)]
     vsite_bonds: bool,
 
     /// Bypass the transformation matrix and use the physical parameters
     /// directly
-    use_pvals: bool,
+    #[serde(default)]
+    pub(crate) use_pvals: bool,
 
     /// Execute Work Queue tasks and local calculations asynchronously for
     /// improved speed
@@ -124,61 +140,27 @@ struct Config {
 
     /// Re-evaluate the objective function and gradients when the step is
     /// rejected (for noisy objective functions).
+    #[serde(default)]
     reevaluate: bool,
 
     /// Continue the current run from where we left off (supports mid-iteration
     /// recovery).
     #[serde(rename = "continue")]
+    #[serde(default)]
     cont: bool,
 
     /// Allow duplicate parameter names (only if you know what you are doing!
+    #[serde(default)]
     duplicate_pnames: bool,
 }
 
-fn default_penalty_type() -> String {
-    String::from("L2")
-}
-
-fn default_ffdir() -> String {
-    String::from("forcefield")
-}
-
-fn default_maxstep() -> isize {
-    100
-}
-
-fn default_objective_history() -> isize {
-    2
-}
-
-fn default_criteria() -> isize {
-    1
-}
-
-fn default_zerograd() -> isize {
-    -1
-}
-
-fn default_backup() -> bool {
-    true
-}
-
-fn default_writechk_step() -> bool {
-    true
-}
-
-fn default_retain_micro_outputs() -> bool {
-    true
-}
-
-fn default_print_gradient() -> bool {
-    true
-}
-
-fn default_print_parameters() -> bool {
-    true
-}
-
-fn default_normalize_weights() -> bool {
-    true
+impl Config {
+    pub fn load<P>(path: P) -> Result<Self, Box<dyn Error>>
+    where
+        P: AsRef<Path>,
+    {
+        let contents = read_to_string(path)?;
+        let config = toml::from_str(&contents)?;
+        Ok(config)
+    }
 }

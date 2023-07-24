@@ -12,7 +12,7 @@ pub mod objective;
 #[allow(unused)]
 pub mod optimizer;
 
-mod config;
+pub mod config;
 
 mod work_queue;
 
