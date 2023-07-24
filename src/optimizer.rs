@@ -205,8 +205,9 @@ impl Optimizer {
         // order of derivatives
         let ord = if bfgs { 1 } else { 2 };
         self.set_good_step(true);
-        let best_step = 1; // TODO should be zero?
-                           // objective function history
+        // TODO should be zero?
+        let best_step = 1;
+        // objective function history
         let mut x_hist: Vec<f64> = Vec::new();
         // trust radius
         let mut trust = self.trust0.abs();
