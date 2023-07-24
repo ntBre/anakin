@@ -1,3 +1,5 @@
+use openff_toolkit::smirnoff::ForceField;
+
 use crate::{config::Config, Dmat, Dvec};
 
 #[derive(Clone)]
@@ -26,6 +28,9 @@ pub struct FF {
 
     /// force field directory relative to the project directory
     ffdir: String,
+
+    /// the full force fields
+    forcefields: Vec<ForceField>,
 }
 
 impl FF {
@@ -39,6 +44,15 @@ impl FF {
         // TODO qmat2 needs to be set for real
         let transmat = qmat2 * Dmat::from_diagonal(&rs);
         let tmi = transmat.transpose();
+        let fnms = config.forcefield.clone();
+        let mut forcefields = Vec::new();
+        for fnm in &fnms {
+            forcefields.push(ForceField::load(fnm).unwrap());
+        }
+
+        // TODO there is supposed to be more processing of the force fields here
+        // to extract the useful parts. really we probably don't even need the
+        // original ForceField structs
         FF {
             np,
             use_pvals: config.use_pvals,
@@ -46,8 +60,9 @@ impl FF {
             pvals0,
             plist: Vec::new(),
             excision: Vec::new(),
-            fnms: config.forcefield.clone(),
+            fnms,
             ffdir: config.ffdir.clone(),
+            forcefields,
         }
     }
 
@@ -100,6 +115,7 @@ impl Default for FF {
             excision: Vec::new(),
             fnms: Vec::new(),
             ffdir: String::from("forcefield"),
+            forcefields: Vec::new(),
         }
     }
 }
