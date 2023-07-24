@@ -64,6 +64,10 @@ impl FF {
 
         pvals
     }
+
+    pub(crate) fn make_redirect(&self, mvals: Dvec) {
+        todo!()
+    }
 }
 
 impl Default for FF {

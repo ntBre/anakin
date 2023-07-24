@@ -8,9 +8,8 @@ use crate::{
     Dmat, Dvec,
 };
 
-mod solvers;
-
 mod optimize;
+mod solvers;
 
 /// a struct representing all possible convergence criteria
 struct Criteria {
@@ -102,6 +101,14 @@ pub struct Optimizer {
     step_lowerbound: f64,
 
     eps: f64,
+
+    /// levenberg-marquardt guess. lm_guess from config
+    lmg: f64,
+
+    /// (float) Search tolerance; used only when trust radius is negative,
+    /// dictates convergence threshold of nonlinear search. search_tolerance
+    /// from config
+    search_tol: f64,
 }
 
 impl Optimizer {
@@ -132,8 +139,12 @@ impl Optimizer {
             convergence_gradient: 1e-3,
             convergence_step: 1e-4,
             criteria: 1,
+            // eig_lowerbound. this comment got moved around. is this the right
+            // place?
             step_lowerbound: 1e-6,
-            eps: 1e-4, // eig_lowerbound
+            eps: 1e-4,
+            lmg: 1.0,
+            search_tol: 1e-4,
         }
     }
 
@@ -485,7 +496,12 @@ impl Optimizer {
         }
     }
 
-    fn step(&self, xk: Dvec, data: ObjMap, trust: f64) -> (Dvec, f64, bool) {
+    fn step(
+        &mut self,
+        xk: Dvec,
+        data: ObjMap,
+        trust: f64,
+    ) -> (Dvec, f64, bool) {
         // TODO could be a field on `self` but doesnt seem necessary
         let bhyp = !matches!(
             self.objective.penalty.ptype,
@@ -547,9 +563,38 @@ impl Optimizer {
 
         // TODO counting micro iterations
 
+        let trust_fun = |l| {
+            let n = solver(l).0.norm();
+            let d = n - trust;
+            d * d
+        };
+
+        // evaluate ONLY the objective function. most useful when the objective
+        // is cheap, but the derivative is expensive
+        let search_fun = |l| {
+            // dx is how much the step changes from the previous step
+            let (dx, sol) = solver(l);
+            // this is our trial step
+            let xk_ = dx + &xk;
+            let result = self.objective.full(xk_, 0).x - data.x;
+            // TODO if not self.retain_micro_outputs delete output dirs
+
+            // TODO search_fun.micro += 1
+
+            result
+        };
+
+        let h_fun = |l| {
+            let n = solver(l).0.norm();
+            let d = n - self.h;
+            d * d
+        };
+
+        let mut bump = false;
+        let (mut dx, mut expect);
         if self.trust0 > 0.0 {
-            let mut bump = false;
-            let (dx, expect) = solver(1);
+            // trust region code
+            (dx, expect) = solver(1.0);
             let dxnorm = dx.norm();
             if dxnorm > trust {
                 bump = true;
@@ -557,9 +602,57 @@ impl Optimizer {
                 // Okay, the problem with Brent is that the tolerance is
                 // fractional. If the optimized value is zero, then it takes a
                 // lot of meaningless steps.
-                todo!("implement scipy.optimize.brent");
+                let lopt =
+                    optimize::brent(trust_fun, self.lmg..4.0 * self.lmg, 1e-6)
+                        .0;
+                (dx, expect) = solver(lopt);
+                let dxnorm = dx.norm();
+            } // else we found the step
+        } else {
+            // search code
+
+            // first obtain a step that is roughly the same length as the
+            // provided trust radiusu
+            let (mut dx, mut expect) = solver(1.0);
+            let mut dxnorm = dx.norm();
+            let mut lopt;
+            if dxnorm > trust {
+                lopt =
+                    optimize::brent(trust_fun, self.lmg..4.0 * self.lmg, 1e-4)
+                        .0;
+                (dx, expect) = solver(lopt);
+                dxnorm = dx.norm();
+            } else {
+                lopt = 1.0;
             }
+            bump = false;
+            // TODO micro = 0
+
+            // TODO this time we need the full output
+            let result =
+                optimize::brent(search_fun, lopt..4.0 * lopt, self.search_tol);
+            if result.1 > 0.0 {
+                lopt = optimize::brent(h_fun, self.lmg..4.0 * self.lmg, 1e-6).0;
+                (dx, expect) = solver(lopt);
+                dxnorm = dx.norm();
+                // restarting search with step size dxnorm
+                let result = optimize::brent(
+                    search_fun,
+                    lopt..4.0 * lopt,
+                    self.search_tol,
+                );
+            }
+            (dx, _) = solver(result.0);
+            expect = result.1;
+            // optimization step found
         }
-        todo!()
+
+        use PenaltyType::*;
+        // TODO is_fuse() ?
+        if matches!(self.objective.penalty.ptype, Fuse | FuseL0 | FuseBarrier) {
+            self.forcefield.make_redirect(dx + xk);
+        }
+
+        (dx, expect, bump)
     }
 }

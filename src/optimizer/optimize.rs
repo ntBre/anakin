@@ -1,5 +1,13 @@
 use std::ops::Range;
 
+pub fn brent<F>(func: F, brack: Range<f64>, tol: f64) -> (f64, f64)
+where
+    F: Fn(f64) -> f64,
+{
+    let brent = Brent::new(func, brack, tol);
+    brent.optimize()
+}
+
 /// Given a function of one variable and a bracket, return a local minimizer of
 /// the function isolated to a fractional precision of tol. Adapted from
 /// `scipy.optimize.brent`
@@ -20,7 +28,8 @@ where
         Self { func, brack, tol }
     }
 
-    fn optimize(self) -> f64 {
+    /// returns the minimum and the function value at the minimum
+    fn optimize(self) -> (f64, f64) {
         let (xa, xb, xc, fa, fb, fc, mut funcalls) = self.get_bracket_info();
         const MINTOL: f64 = 1e-11;
         const CG: f64 = 0.3819660;
@@ -147,7 +156,7 @@ where
         }
         // END CORE ALGORITHM
 
-        x
+        (x, fx)
     }
 
     fn get_bracket_info(&self) -> (f64, f64, f64, f64, f64, f64, usize) {
