@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use nalgebra::SVD;
 
 use crate::{
@@ -33,7 +35,7 @@ impl Criteria {
 }
 
 pub struct Optimizer {
-    objective: Objective,
+    objective: RefCell<Objective>,
     forcefield: FF,
 
     trust0: f64,
@@ -114,7 +116,7 @@ pub struct Optimizer {
 impl Optimizer {
     pub fn new(objective: Objective, forcefield: FF) -> Self {
         Self {
-            objective,
+            objective: RefCell::new(objective),
             forcefield,
             /// TODO take these from config file. I'm taking default values from
             /// the config file produced by the example script. maybe these
@@ -249,7 +251,7 @@ impl Optimizer {
                 self.adjh(trust);
                 // TODO see if xk can be borrowed here. it might even need to be
                 // mutated?
-                self.objective.full(xk.clone(), ord)
+                self.objective.borrow_mut().full(xk.clone(), ord)
             };
 
             ObjMap { x, g, h, .. } = data.clone();
@@ -294,7 +296,7 @@ impl Optimizer {
                         }
 
                         let ObjMap { x, g, h, .. } =
-                            self.objective.full(xk.clone(), ord);
+                            self.objective.borrow_mut().full(xk.clone(), ord);
                         self.set_good_step(true);
                         ndx = 0.0;
                         nxk = xk.norm();
@@ -478,7 +480,7 @@ impl Optimizer {
 
     pub fn set_good_step(&mut self, good_step: bool) {
         self.good_step = good_step;
-        for target in self.objective.targets.iter_mut() {
+        for target in self.objective.borrow_mut().targets.iter_mut() {
             target.good_step = good_step;
         }
     }
@@ -490,7 +492,7 @@ impl Optimizer {
         if h != self.h {
             // setting finite difference step size
             self.h = h;
-            for target in self.objective.targets.iter_mut() {
+            for target in self.objective.borrow_mut().targets.iter_mut() {
                 target.h = h;
             }
         }
@@ -504,7 +506,7 @@ impl Optimizer {
     ) -> (Dvec, f64, bool) {
         // TODO could be a field on `self` but doesnt seem necessary
         let bhyp = !matches!(
-            self.objective.penalty.ptype,
+            self.objective.borrow().penalty.ptype,
             PenaltyType::Parabolic | PenaltyType::Box
         );
 
@@ -576,7 +578,7 @@ impl Optimizer {
             let (dx, sol) = solver(l);
             // this is our trial step
             let xk_ = dx + &xk;
-            let result = self.objective.full(xk_, 0).x - data.x;
+            let result = self.objective.borrow_mut().full(xk_, 0).x - data.x;
             // TODO if not self.retain_micro_outputs delete output dirs
 
             // TODO search_fun.micro += 1
@@ -613,7 +615,7 @@ impl Optimizer {
 
             // first obtain a step that is roughly the same length as the
             // provided trust radiusu
-            let (mut dx, mut expect) = solver(1.0);
+            (dx, expect) = solver(1.0);
             let mut dxnorm = dx.norm();
             let mut lopt;
             if dxnorm > trust {
@@ -649,8 +651,11 @@ impl Optimizer {
 
         use PenaltyType::*;
         // TODO is_fuse() ?
-        if matches!(self.objective.penalty.ptype, Fuse | FuseL0 | FuseBarrier) {
-            self.forcefield.make_redirect(dx + xk);
+        if matches!(
+            self.objective.borrow().penalty.ptype,
+            Fuse | FuseL0 | FuseBarrier
+        ) {
+            self.forcefield.make_redirect(&dx + xk);
         }
 
         (dx, expect, bump)
