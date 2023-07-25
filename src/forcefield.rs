@@ -360,7 +360,52 @@ fn add_propers(
                             );
                         }
                     }
-                    _ => unimplemented!(),
+                    "k4" => {
+                        if let Some(k4) = &proper.k4 {
+                            inner.push((
+                                pvals0.len(),
+                                "k4".to_owned(),
+                                k4.unit.clone(),
+                            ));
+                            pvals0.push(k4.value);
+                        } else {
+                            eprintln!(
+                                "warning: optimization of k4 requested but k4 \
+				 not found"
+                            );
+                        }
+                    }
+                    "k5" => {
+                        if let Some(k5) = &proper.k5 {
+                            inner.push((
+                                pvals0.len(),
+                                "k5".to_owned(),
+                                k5.unit.clone(),
+                            ));
+                            pvals0.push(k5.value);
+                        } else {
+                            eprintln!(
+                                "warning: optimization of k5 requested but k5 \
+				 not found"
+                            );
+                        }
+                    }
+                    "k6" => {
+                        if let Some(k6) = &proper.k6 {
+                            inner.push((
+                                pvals0.len(),
+                                "k6".to_owned(),
+                                k6.unit.clone(),
+                            ));
+                            pvals0.push(k6.value);
+                        } else {
+                            eprintln!(
+                                "warning: optimization of k6 requested but k6 \
+				 not found"
+                            );
+                        }
+                    }
+                    p => unimplemented!("{p}"),
                 }
             }
             propers_to_optimize.push(Param::Opt { inner });
