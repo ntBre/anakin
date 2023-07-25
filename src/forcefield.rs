@@ -72,12 +72,6 @@ pub struct FF {
 
     openff_forcefield: ForceField,
 
-    /// A list where pfields[i] = [pid, 'file', line, field, mult, cmd],
-    /// basically a new way to modify force field files; when we modify the
-    /// force field file, we go to the specific line/field in a given file and
-    /// change the number. NOTE: is this genius or insanity??
-    pfields: Vec<String>,
-
     /// improved representation of pfields as a networkx graph. NOTE: please,
     /// please, please let this be unused.
     ptree: Digraph,
@@ -194,7 +188,6 @@ impl FF {
             ffdata_isxml,
             offxml: offxml.unwrap(),
             openff_forcefield: openff_forcefield.unwrap(),
-            pfields: todo!(),
             ptree: Digraph,
             offxml_unit_strs: todo!(),
             rs: todo!(),
