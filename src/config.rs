@@ -243,7 +243,7 @@ pub struct Config {
     /// `forcefields/filename.ext`.
     pub(crate) forcefield: Vec<String>,
 
-    pub(crate) priors: Option<HashMap<String, String>>,
+    pub(crate) priors: Option<HashMap<String, HashMap<String, f64>>>,
 }
 
 impl Config {

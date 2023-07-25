@@ -1,6 +1,9 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
-use openff_toolkit::smirnoff::ForceField;
+use openff_toolkit::smirnoff::{ForceField, Unit};
 
 use crate::{config::Config, Dmat, Dvec};
 
@@ -22,7 +25,7 @@ pub struct FF {
     ffdir: String,
 
     /// priors given by the user
-    priors: HashMap<String, String>,
+    priors: HashMap<String, HashMap<String, f64>>,
 
     /// whether to constrain the charges
     constrain_charge: bool,
@@ -111,12 +114,32 @@ pub struct FF {
 
     /// a list of atom names
     atomnames: Vec<String>,
+
+    /// each entry in these vecs corresponds to one parameter of the associated
+    /// type in `self.openff_forcefield`. to construct a new force field with
+    /// the optimized values, loop over these vectors; for a NoOpt, take the
+    /// value of the parameter straight from the original force field; for an
+    /// Opt, loop over its `inner` entries, taking the values from the indices
+    /// into pvals and the field names and units from the Strings
+    bonds_to_optimize: Vec<Param>,
+    angles_to_optimize: Vec<Param>,
+    propers_to_optimize: Vec<Param>,
+}
+
+#[derive(Clone, Debug)]
+enum Param {
+    Opt {
+        inner: Vec<(usize, String, Unit)>,
+    },
+    /// not being optimized, pass it along straight from the original force
+    /// field
+    NoOpt,
 }
 
 impl FF {
     pub fn new(config: &Config) -> Self {
         // TODO clearly this is supposed to have some length
-        let pvals0 = Dvec::zeros(0);
+        let mut pvals0 = Vec::new();
         // TODO real value here
         let np = 0;
         let rs = Dvec::from_element(pvals0.len(), 1.0);
@@ -126,16 +149,36 @@ impl FF {
         let tmi = transmat.transpose();
         let fnms = config.forcefield.clone();
 
-        // addff in python version
+        // combination of addff and addff_xml in python version
         let mut forcefields = Vec::new();
         let mut offxml = None;
         let mut openff_forcefield = None;
         let mut ffdata_isxml = HashMap::new();
+        let ffdir = Path::new(&config.ffdir);
+        let mut bonds_to_optimize = Vec::new();
+        let mut angles_to_optimize = Vec::new();
+        let mut propers_to_optimize = Vec::new();
         for fnm in &fnms {
             offxml = Some(fnm.clone());
-            let ff = ForceField::load(fnm).unwrap();
+            let ff_file = &ffdir.join(fnm);
+            let ff = match ForceField::load(ff_file) {
+                Ok(ff) => ff,
+                Err(e) => panic!("failed to open {ff_file:?} with {e}"),
+            };
             openff_forcefield = Some(ff.clone());
             ffdata_isxml.insert(fnm.clone(), true);
+
+            // idea here should really be to partition the parameters into those
+            // we want to optimize and those to leave alone. we just need some
+            // representation that lets us change the values we need to change
+            // and write them back to a force field file along with the ones we
+            // shouldn't change. the python code seems to be editing the strings
+            // in place, but it makes a lot more sense to use the structs I
+            // already have defined from SMIRNOFF
+            add_bonds(&ff, &mut pvals0, &mut bonds_to_optimize);
+            add_angles(&ff, &mut pvals0, &mut angles_to_optimize);
+            add_propers(&ff, &mut pvals0, &mut propers_to_optimize);
+
             forcefields.push(ff);
         }
 
@@ -171,8 +214,11 @@ impl FF {
             tmi,
             excision: Vec::new(),
             np,
-            pvals0,
+            pvals0: Dvec::from(pvals0),
             atomnames: todo!(),
+            bonds_to_optimize: todo!(),
+            angles_to_optimize: todo!(),
+            propers_to_optimize: todo!(),
         }
     }
 
@@ -209,5 +255,135 @@ impl FF {
 
     pub(crate) fn make_redirect(&self, mvals: Dvec) {
         todo!()
+    }
+}
+
+fn add_bonds(
+    ff: &ForceField,
+    pvals0: &mut Vec<f64>,
+    bonds_to_optimize: &mut Vec<Param>,
+) {
+    for (i, bond) in (&ff.bonds).into_iter().enumerate() {
+        if let Some(to_optimize) = &bond.parameterize {
+            let mut inner = Vec::new();
+            for param in to_optimize.split(',').map(str::trim) {
+                match param {
+                    "length" => {
+                        inner.push((
+                            pvals0.len(),
+                            "length".to_owned(),
+                            bond.length.unit.clone(),
+                        ));
+                        pvals0.push(bond.length.value);
+                    }
+                    "k" => {
+                        inner.push((
+                            pvals0.len(),
+                            "k".to_owned(),
+                            bond.k.unit.clone(),
+                        ));
+                        pvals0.push(bond.k.value);
+                    }
+                    _ => unimplemented!(),
+                }
+            }
+            bonds_to_optimize.push(Param::Opt { inner });
+        } else {
+            bonds_to_optimize.push(Param::NoOpt);
+        }
+    }
+}
+
+fn add_angles(
+    ff: &ForceField,
+    pvals0: &mut Vec<f64>,
+    angles_to_optimize: &mut Vec<Param>,
+) {
+    for (i, angle) in (&ff.angles).into_iter().enumerate() {
+        if let Some(to_optimize) = &angle.parameterize {
+            let mut inner = Vec::new();
+            for param in to_optimize.split(',').map(str::trim) {
+                match param {
+                    "angle" => {
+                        inner.push((
+                            pvals0.len(),
+                            "angle".to_owned(),
+                            angle.angle.unit.clone(),
+                        ));
+                        pvals0.push(angle.angle.value);
+                    }
+                    "k" => {
+                        inner.push((
+                            pvals0.len(),
+                            "k".to_owned(),
+                            angle.k.unit.clone(),
+                        ));
+                        pvals0.push(angle.k.value);
+                    }
+                    _ => unimplemented!(),
+                }
+            }
+            angles_to_optimize.push(Param::Opt { inner });
+        } else {
+            angles_to_optimize.push(Param::NoOpt);
+        }
+    }
+}
+
+fn add_propers(
+    ff: &ForceField,
+    pvals0: &mut Vec<f64>,
+    propers_to_optimize: &mut Vec<Param>,
+) {
+    for (i, proper) in (&ff.proper_torsions).into_iter().enumerate() {
+        if let Some(to_optimize) = &proper.parameterize {
+            let mut inner = Vec::new();
+            for param in to_optimize.split(',').map(str::trim) {
+                match param {
+                    "k1" => {
+                        inner.push((
+                            pvals0.len(),
+                            "k1".to_owned(),
+                            proper.k1.unit.clone(),
+                        ));
+                        pvals0.push(proper.k1.value);
+                    }
+                    "k2" => {
+                        if let Some(k2) = &proper.k2 {
+                            inner.push((
+                                pvals0.len(),
+                                "k2".to_owned(),
+                                k2.unit.clone(),
+                            ));
+                            pvals0.push(k2.value);
+                        } else {
+                            eprintln!(
+                                "warning: optimization of k2 requested but k2 \
+				       not found"
+                            );
+                        }
+                    }
+                    "k3" => {
+                        if let Some(k3) = &proper.k3 {
+                            inner.push((
+                                pvals0.len(),
+                                "k3".to_owned(),
+                                k3.unit.clone(),
+                            ));
+                            pvals0.push(k3.value);
+                        } else {
+                            eprintln!(
+                                "warning: optimization of k3 requested but k3 \
+				 not found"
+                            );
+                        }
+                    }
+                    _ => unimplemented!(),
+                }
+            }
+            propers_to_optimize.push(Param::Opt { inner });
+        } else {
+            propers_to_optimize.push(Param::NoOpt);
+        }
     }
 }
