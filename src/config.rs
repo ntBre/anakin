@@ -1,4 +1,4 @@
-use std::{error::Error, fs::read_to_string, path::Path};
+use std::{collections::HashMap, error::Error, fs::read_to_string, path::Path};
 
 use serde::Deserialize;
 
@@ -36,7 +36,8 @@ pub struct Config {
     pub(crate) ffdir: String,
 
     /// The AMOEBA polarization type, either direct, mutual, or nonpolarizable.
-    amoeba_pol: Option<String>,
+    /// TODO if we use this it should actually be an enum
+    pub(crate) amoeba_pol: Option<String>,
 
     /// Path to AMBER installation directory (leave blank to use AMBERHOME
     /// environment variable.
@@ -89,7 +90,7 @@ pub struct Config {
     have_vsite: bool,
 
     /// Specify whether to constrain the charges on the molecules.
-    constrain_charge: bool,
+    pub(crate) constrain_charge: bool,
 
     /// Print the objective function gradient at every step
     #[serde(default = "default_print_gradient")]
@@ -97,7 +98,7 @@ pub struct Config {
 
     /// Optimize in the space of log-variables
     #[serde(default)]
-    logarithmic_map: bool,
+    pub(crate) logarithmic_map: bool,
 
     /// Print the objective function Hessian at every step
     #[serde(default)]
@@ -118,11 +119,11 @@ pub struct Config {
 
     /// Perform calculations using rigid water molecules.
     #[serde(default)]
-    rigid_water: bool,
+    pub(crate) rigid_water: bool,
 
     /// Perform calculations with contrained hydrogen bond lengths.
     #[serde(default)]
-    constrain_h: bool,
+    pub(crate) constrain_h: bool,
 
     /// Generate bonds from virtual sites to host atom bonded atoms.
     #[serde(default)]
@@ -150,7 +151,7 @@ pub struct Config {
 
     /// Allow duplicate parameter names (only if you know what you are doing!
     #[serde(default)]
-    duplicate_pnames: bool,
+    pub(crate) duplicate_pnames: bool,
 
     /// Levenberg-Marquardt trust radius; set to negative for nonlinear search
     #[serde(default = "default_trust0")]
@@ -236,11 +237,13 @@ pub struct Config {
     search_tolerance: f64,
 
     /// The AMOEBA mutual polarization criterion.
-    amoeba_eps: Option<f64>,
+    pub(crate) amoeba_eps: Option<f64>,
 
     /// The names of force fields, corresponding to files
     /// `forcefields/filename.ext`.
     pub(crate) forcefield: Vec<String>,
+
+    pub(crate) priors: Option<HashMap<String, String>>,
 }
 
 impl Config {

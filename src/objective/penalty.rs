@@ -72,7 +72,6 @@ pub(crate) struct Penalty {
     a: f64,
     b: f64,
     p: f64,
-    ff: FF,
     pub(crate) ptype: PenaltyType,
     // spacings: HashMap?
 }
