@@ -164,6 +164,42 @@ impl FF {
             forcefields.push(ff);
         }
 
+        dbg!(pvals0.len());
+
+        // rsmake in python
+
+        // extracting the maximum values of the parameters for computing the
+        // rescaling factors.
+        //
+        // TODO add something like an `as_hash` method on bond, angle, and
+        // torsions so I can isolate these matches there
+        let mut max_bond = HashMap::new();
+        for (i, param) in bonds_to_optimize.iter().enumerate() {
+            if let Param::Opt { inner } = param {
+                for (_, typ, _unit) in inner {
+                    let val = match typ.as_str() {
+                        "length" => {
+                            openff_forcefield.as_ref().unwrap().bonds.bonds[i]
+                                .length
+                                .value
+                        }
+                        "k" => {
+                            openff_forcefield.as_ref().unwrap().bonds.bonds[i]
+                                .k
+                                .value
+                        }
+                        _ => unimplemented!(),
+                    };
+                    let cur = max_bond.entry(typ).or_insert(val);
+                    if val > *cur {
+                        *cur = val;
+                    }
+                }
+            }
+        }
+
+        dbg!(max_bond);
+
         // TODO there is supposed to be more processing of the force fields here
         // to extract the useful parts. really we probably don't even need the
         // original ForceField structs
