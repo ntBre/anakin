@@ -77,7 +77,7 @@ pub struct FF {
     ptree: Digraph,
 
     /// list of rescaling factors
-    rs: Vec<f64>,
+    rs: Dvec,
 
     /// transformation matrix for mathematical -> physical parameters
     tm: Dmat,
@@ -170,27 +170,16 @@ impl FF {
 
         // extracting the maximum values of the parameters for computing the
         // rescaling factors.
-        //
-        // TODO add something like an `as_hash` method on bond, angle, and
-        // torsions so I can isolate these matches there
         let mut max_bond = HashMap::new();
         for (i, param) in bonds_to_optimize.iter().enumerate() {
             if let Param::Opt { inner } = param {
                 for (_, typ, _unit) in inner {
-                    let val = match typ.as_str() {
-                        "length" => {
-                            openff_forcefield.as_ref().unwrap().bonds.bonds[i]
-                                .length
-                                .value
-                        }
-                        "k" => {
-                            openff_forcefield.as_ref().unwrap().bonds.bonds[i]
-                                .k
-                                .value
-                        }
-                        _ => unimplemented!(),
-                    };
-                    let cur = max_bond.entry(typ).or_insert(val);
+                    let val = openff_forcefield.as_ref().unwrap().bonds[i]
+                        .as_hash(typ)
+                        .unwrap()
+                        .value
+                        .abs();
+                    let cur = max_bond.entry(typ.clone()).or_insert(val);
                     if val > *cur {
                         *cur = val;
                     }
@@ -198,7 +187,100 @@ impl FF {
             }
         }
 
-        dbg!(max_bond);
+        let mut max_angle = HashMap::new();
+        for (i, param) in angles_to_optimize.iter().enumerate() {
+            if let Param::Opt { inner } = param {
+                for (_, typ, _unit) in inner {
+                    let val = openff_forcefield.as_ref().unwrap().angles[i]
+                        .as_hash(typ)
+                        .unwrap()
+                        .value
+                        .abs();
+                    let cur = max_angle.entry(typ.clone()).or_insert(val);
+                    if val > *cur {
+                        *cur = val;
+                    }
+                }
+            }
+        }
+
+        let mut max_proper = HashMap::new();
+        for (i, param) in propers_to_optimize.iter().enumerate() {
+            if let Param::Opt { inner } = param {
+                for (_, typ, _unit) in inner {
+                    let val =
+                        openff_forcefield.as_ref().unwrap().proper_torsions[i]
+                            .as_hash(typ)
+                            .unwrap()
+                            .value
+                            .abs();
+                    let cur = max_proper.entry(typ.clone()).or_insert(val);
+                    if val > *cur {
+                        *cur = val;
+                    }
+                }
+            }
+        }
+
+        // overwrite from priors
+        if let Some(map) = &config.priors {
+            if let Some(bonds) = map.get("bonds") {
+                for (key, value) in bonds {
+                    max_bond.insert(key.to_string(), *value);
+                }
+            }
+            if let Some(angles) = map.get("angles") {
+                for (key, value) in angles {
+                    max_angle.insert(key.to_string(), *value);
+                }
+            }
+            if let Some(propers) = map.get("propertorsions") {
+                for (key, value) in propers {
+                    if key == "k" {
+                        for key in ["k1", "k2", "k3", "k4", "k5", "k6"] {
+                            max_proper.insert(key.to_string(), *value);
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut rs = Dvec::from_element(pvals0.len(), 1.0);
+        'outer: for i in 0..pvals0.len() {
+            for bond in &bonds_to_optimize {
+                if let Param::Opt { inner } = bond {
+                    for (x, typ, _) in inner {
+                        if *x == i {
+                            rs[i] = *max_bond.get(typ).unwrap();
+                            continue 'outer;
+                        }
+                    }
+                }
+            }
+            for angle in &angles_to_optimize {
+                if let Param::Opt { inner } = angle {
+                    for (x, typ, _) in inner {
+                        if *x == i {
+                            rs[i] = *max_angle.get(typ).unwrap();
+                            continue 'outer;
+                        }
+                    }
+                }
+            }
+            for proper in &propers_to_optimize {
+                if let Param::Opt { inner } = proper {
+                    for (x, typ, _) in inner {
+                        if *x == i {
+                            rs[i] = *max_proper.get(typ).unwrap();
+                            continue 'outer;
+                        }
+                    }
+                }
+            }
+        }
+
+        // TODO might have to overwrite with physically-motivated values, but
+        // they aren't triggered for the force field I'm testing on
 
         // TODO there is supposed to be more processing of the force fields here
         // to extract the useful parts. really we probably don't even need the
@@ -222,7 +304,7 @@ impl FF {
             offxml: offxml.unwrap(),
             openff_forcefield: openff_forcefield.unwrap(),
             ptree: Digraph,
-            rs: todo!(),
+            rs,
             tm: todo!(),
             tmi,
             excision: Vec::new(),
@@ -261,6 +343,8 @@ impl FF {
     }
 }
 
+// TODO might be able to factor these out with the use of parameter_handlers
+
 fn add_bonds(
     ff: &ForceField,
     pvals0: &mut Vec<f64>,
@@ -270,25 +354,9 @@ fn add_bonds(
         if let Some(to_optimize) = &bond.parameterize {
             let mut inner = Vec::new();
             for param in to_optimize.split(',').map(str::trim) {
-                match param {
-                    "length" => {
-                        inner.push((
-                            pvals0.len(),
-                            "length".to_owned(),
-                            bond.length.unit.clone(),
-                        ));
-                        pvals0.push(bond.length.value);
-                    }
-                    "k" => {
-                        inner.push((
-                            pvals0.len(),
-                            "k".to_owned(),
-                            bond.k.unit.clone(),
-                        ));
-                        pvals0.push(bond.k.value);
-                    }
-                    _ => unimplemented!(),
-                }
+                let p = bond.as_hash(param).unwrap();
+                inner.push((pvals0.len(), param.to_owned(), p.unit.clone()));
+                pvals0.push(p.value);
             }
             bonds_to_optimize.push(Param::Opt { inner });
         } else {
@@ -306,25 +374,9 @@ fn add_angles(
         if let Some(to_optimize) = &angle.parameterize {
             let mut inner = Vec::new();
             for param in to_optimize.split(',').map(str::trim) {
-                match param {
-                    "angle" => {
-                        inner.push((
-                            pvals0.len(),
-                            "angle".to_owned(),
-                            angle.angle.unit.clone(),
-                        ));
-                        pvals0.push(angle.angle.value);
-                    }
-                    "k" => {
-                        inner.push((
-                            pvals0.len(),
-                            "k".to_owned(),
-                            angle.k.unit.clone(),
-                        ));
-                        pvals0.push(angle.k.value);
-                    }
-                    _ => unimplemented!(),
-                }
+                let p = angle.as_hash(param).unwrap();
+                inner.push((pvals0.len(), param.to_owned(), p.unit.clone()));
+                pvals0.push(p.value);
             }
             angles_to_optimize.push(Param::Opt { inner });
         } else {
@@ -342,92 +394,9 @@ fn add_propers(
         if let Some(to_optimize) = &proper.parameterize {
             let mut inner = Vec::new();
             for param in to_optimize.split(',').map(str::trim) {
-                match param {
-                    "k1" => {
-                        inner.push((
-                            pvals0.len(),
-                            "k1".to_owned(),
-                            proper.k1.unit.clone(),
-                        ));
-                        pvals0.push(proper.k1.value);
-                    }
-                    "k2" => {
-                        if let Some(k2) = &proper.k2 {
-                            inner.push((
-                                pvals0.len(),
-                                "k2".to_owned(),
-                                k2.unit.clone(),
-                            ));
-                            pvals0.push(k2.value);
-                        } else {
-                            eprintln!(
-                                "warning: optimization of k2 requested but k2 \
-				       not found"
-                            );
-                        }
-                    }
-                    "k3" => {
-                        if let Some(k3) = &proper.k3 {
-                            inner.push((
-                                pvals0.len(),
-                                "k3".to_owned(),
-                                k3.unit.clone(),
-                            ));
-                            pvals0.push(k3.value);
-                        } else {
-                            eprintln!(
-                                "warning: optimization of k3 requested but k3 \
-				 not found"
-                            );
-                        }
-                    }
-                    "k4" => {
-                        if let Some(k4) = &proper.k4 {
-                            inner.push((
-                                pvals0.len(),
-                                "k4".to_owned(),
-                                k4.unit.clone(),
-                            ));
-                            pvals0.push(k4.value);
-                        } else {
-                            eprintln!(
-                                "warning: optimization of k4 requested but k4 \
-				 not found"
-                            );
-                        }
-                    }
-                    "k5" => {
-                        if let Some(k5) = &proper.k5 {
-                            inner.push((
-                                pvals0.len(),
-                                "k5".to_owned(),
-                                k5.unit.clone(),
-                            ));
-                            pvals0.push(k5.value);
-                        } else {
-                            eprintln!(
-                                "warning: optimization of k5 requested but k5 \
-				 not found"
-                            );
-                        }
-                    }
-                    "k6" => {
-                        if let Some(k6) = &proper.k6 {
-                            inner.push((
-                                pvals0.len(),
-                                "k6".to_owned(),
-                                k6.unit.clone(),
-                            ));
-                            pvals0.push(k6.value);
-                        } else {
-                            eprintln!(
-                                "warning: optimization of k6 requested but k6 \
-				 not found"
-                            );
-                        }
-                    }
-                    p => unimplemented!("{p}"),
-                }
+                let p = proper.as_hash(param).unwrap();
+                inner.push((pvals0.len(), param.to_owned(), p.unit.clone()));
+                pvals0.push(p.value);
             }
             propers_to_optimize.push(Param::Opt { inner });
         } else {
