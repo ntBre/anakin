@@ -1,7 +1,5 @@
 use std::cell::RefCell;
 
-use nalgebra::SVD;
-
 use crate::{
     forcefield::FF,
     objective::{penalty::PenaltyType, ObjMap, Objective},
@@ -214,7 +212,7 @@ impl Optimizer {
         // current value of the parameters
         let mut xk = Dvec::from(self.mvals0.clone());
         // current optimization step
-        let mut dx = Dvec::zeros(self.forcefield.np);
+        let mut dx;
         // length of the current optimization step
         let mut ndx = 0.0;
         // ratio of actual objective function change to expected change
@@ -234,16 +232,16 @@ impl Optimizer {
         let mut xk_prev = Dvec::zeros(0);
         let mut pk_prev = Dvec::zeros(0);
         let mut nxk = 0.0;
-        let mut ngd = 0.0;
+        let mut ngd;
         let mut g_prev = Dvec::zeros(0);
         let mut h_stor = Dmat::zeros(0, 0);
         let mut dx_expect = 0.0;
         let mut datastore = ObjMap::zeros(0);
         let mut bump = false;
         let mut curr_trust = 0.0;
-        let mut x = 0.0;
-        let mut g = Dvec::zeros(0);
-        let mut h = Dmat::zeros(0, 0);
+        let mut x;
+        let mut g;
+        let mut h;
         loop {
             let using_checkpoint = false;
             let mut data = if using_checkpoint {
@@ -320,12 +318,12 @@ impl Optimizer {
                             .max(ndx * (1.0 / (1.0 + self.adapt_fac)));
                     } else if quality >= threhq && bump && self.trust0 > 0.0 {
                         curr_trust = trust;
-                        trust += (self.adapt_fac
+                        trust += self.adapt_fac
                             * trust
                             * f64::exp(
                                 -1.0 * self.adapt_damp
                                     * (trust / self.trust0 - 1.0),
-                            ))
+                            )
                     }
 
                     if best_step {
@@ -511,7 +509,7 @@ impl Optimizer {
             PenaltyType::Parabolic | PenaltyType::Box
         );
 
-        let (x, mut g, mut h) = if bhyp {
+        let (_x, mut g, mut h) = if bhyp {
             (data.x0, data.g0, data.h0)
         } else {
             (data.x, data.g, data.h)

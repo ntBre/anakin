@@ -8,7 +8,6 @@ use default_fns::*;
 
 /// generated partially by `scripts/convert_config.py`
 #[derive(Deserialize)]
-#[allow(unused)]
 pub struct Config {
     /// Path for GROMACS executables (if not the default)
     gmxpath: Option<String>,

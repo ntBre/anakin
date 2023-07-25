@@ -1,15 +1,14 @@
 //! Rust version of the optimization package ForceBalance
 
+#![allow(unused)]
+
 type Dvec = nalgebra::DVector<f64>;
 type Dmat = nalgebra::DMatrix<f64>;
 
-#[allow(unused)]
 pub mod forcefield;
 
-#[allow(unused)]
 pub mod objective;
 
-#[allow(unused)]
 pub mod optimizer;
 
 pub mod config;

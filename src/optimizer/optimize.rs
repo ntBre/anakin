@@ -83,27 +83,27 @@ where
                 let tmp2 = (x - v) * (fx - fw);
                 let mut p = (x - v) * tmp2 - (x - w) * tmp1;
                 let mut tmp2 = 2.0 * (tmp2 - tmp1);
-                if (tmp2 > 0.0) {
+                if tmp2 > 0.0 {
                     p = -p
                 }
                 tmp2 = tmp2.abs();
                 let dx_temp = deltax;
                 deltax = rat.expect(msg);
                 // check parabolic fit
-                if ((p > tmp2 * (a - x))
+                if (p > tmp2 * (a - x))
                     && (p < tmp2 * (b - x))
-                    && (p.abs() < f64::abs(0.5 * tmp2 * dx_temp)))
+                    && (p.abs() < f64::abs(0.5 * tmp2 * dx_temp))
                 {
                     rat = Some(p * 1.0 / tmp2); // if parabolic step is useful.
-                    let u = x + rat.expect(msg);
-                    if ((u - a) < tol2 || (b - u) < tol2) {
+                    u = x + rat.expect(msg);
+                    if (u - a) < tol2 || (b - u) < tol2 {
                         if xmid - x >= 0.0 {
                             rat = Some(tol1)
                         } else {
                             rat = Some(-tol1)
                         }
                     }
-                } else if (x >= xmid) {
+                } else if x >= xmid {
                     deltax = a - x; // if it's not do a golden section step
                 } else {
                     deltax = b - x;
@@ -217,13 +217,13 @@ where
         if (w - xc) * (xb - w) > 0.0 {
             fw = func(w);
             funcalls += 1;
-            if (fw < fc) {
+            if fw < fc {
                 xa = xb;
                 xb = w;
                 fa = fb;
                 fb = fw;
                 break;
-            } else if (fw > fb) {
+            } else if fw > fb {
                 xc = w;
                 fc = fw;
                 break;
@@ -238,7 +238,7 @@ where
         } else if (w - wlim) * (xc - w) > 0.0 {
             fw = func(w);
             funcalls += 1;
-            if (fw < fc) {
+            if fw < fc {
                 xb = xc;
                 xc = w;
                 let w = xc + GOLD * (xc - xb);

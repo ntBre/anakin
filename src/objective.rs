@@ -27,15 +27,15 @@ impl Target {
         todo!()
     }
 
-    fn get_x(&self, mvals: Dvec) -> ! {
+    fn get_x(&self, mvals: &Dvec) -> Extra {
         todo!()
     }
 
-    fn get_g(&self, mvals: Dvec) -> ! {
+    fn get_g(&self, mvals: &Dvec) -> Extra {
         todo!()
     }
 
-    fn get_h(&self, mvals: Dvec) -> ! {
+    fn get_h(&self, mvals: &Dvec) -> Extra {
         todo!()
     }
 }
@@ -167,14 +167,14 @@ impl Objective {
             for tgt in self.targets.iter_mut() {
                 tgt.save = true;
                 let ans: Extra = match order {
-                    0 => tgt.get_x(mvals),
-                    1 => tgt.get_g(mvals),
-                    2 => tgt.get_h(mvals),
+                    0 => tgt.get_x(&mvals),
+                    1 => tgt.get_g(&mvals),
+                    2 => tgt.get_h(&mvals),
                     _ => unimplemented!(),
                 };
                 if !in_fd() {
                     self.obj_map.insert(
-                        tgt.name,
+                        tgt.name.clone(),
                         Regularization::new(tgt.weight / self.wtot, ans.0),
                     );
                 }

@@ -1,4 +1,4 @@
-use crate::{Dmat, Dvec};
+use crate::Dvec;
 
 /// Levenberg-Marquardt
 /// HT = H + (L - 1)^2 * diag(H)
