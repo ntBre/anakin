@@ -166,118 +166,14 @@ impl FF {
 
         dbg!(pvals0.len());
 
-        // rsmake in python
-
-        // extracting the maximum values of the parameters for computing the
-        // rescaling factors.
-        let mut max_bond = HashMap::new();
-        for (i, param) in bonds_to_optimize.iter().enumerate() {
-            if let Param::Opt { inner } = param {
-                for (_, typ, _unit) in inner {
-                    let val = openff_forcefield.as_ref().unwrap().bonds[i]
-                        .as_hash(typ)
-                        .unwrap()
-                        .value
-                        .abs();
-                    let cur = max_bond.entry(typ.clone()).or_insert(val);
-                    if val > *cur {
-                        *cur = val;
-                    }
-                }
-            }
-        }
-
-        let mut max_angle = HashMap::new();
-        for (i, param) in angles_to_optimize.iter().enumerate() {
-            if let Param::Opt { inner } = param {
-                for (_, typ, _unit) in inner {
-                    let val = openff_forcefield.as_ref().unwrap().angles[i]
-                        .as_hash(typ)
-                        .unwrap()
-                        .value
-                        .abs();
-                    let cur = max_angle.entry(typ.clone()).or_insert(val);
-                    if val > *cur {
-                        *cur = val;
-                    }
-                }
-            }
-        }
-
-        let mut max_proper = HashMap::new();
-        for (i, param) in propers_to_optimize.iter().enumerate() {
-            if let Param::Opt { inner } = param {
-                for (_, typ, _unit) in inner {
-                    let val =
-                        openff_forcefield.as_ref().unwrap().proper_torsions[i]
-                            .as_hash(typ)
-                            .unwrap()
-                            .value
-                            .abs();
-                    let cur = max_proper.entry(typ.clone()).or_insert(val);
-                    if val > *cur {
-                        *cur = val;
-                    }
-                }
-            }
-        }
-
-        // overwrite from priors
-        if let Some(map) = &config.priors {
-            if let Some(bonds) = map.get("bonds") {
-                for (key, value) in bonds {
-                    max_bond.insert(key.to_string(), *value);
-                }
-            }
-            if let Some(angles) = map.get("angles") {
-                for (key, value) in angles {
-                    max_angle.insert(key.to_string(), *value);
-                }
-            }
-            if let Some(propers) = map.get("propertorsions") {
-                for (key, value) in propers {
-                    if key == "k" {
-                        for key in ["k1", "k2", "k3", "k4", "k5", "k6"] {
-                            max_proper.insert(key.to_string(), *value);
-                        }
-                    }
-                }
-            }
-        }
-
-        let mut rs = Dvec::from_element(pvals0.len(), 1.0);
-        'outer: for i in 0..pvals0.len() {
-            for bond in &bonds_to_optimize {
-                if let Param::Opt { inner } = bond {
-                    for (x, typ, _) in inner {
-                        if *x == i {
-                            rs[i] = *max_bond.get(typ).unwrap();
-                            continue 'outer;
-                        }
-                    }
-                }
-            }
-            for angle in &angles_to_optimize {
-                if let Param::Opt { inner } = angle {
-                    for (x, typ, _) in inner {
-                        if *x == i {
-                            rs[i] = *max_angle.get(typ).unwrap();
-                            continue 'outer;
-                        }
-                    }
-                }
-            }
-            for proper in &propers_to_optimize {
-                if let Param::Opt { inner } = proper {
-                    for (x, typ, _) in inner {
-                        if *x == i {
-                            rs[i] = *max_proper.get(typ).unwrap();
-                            continue 'outer;
-                        }
-                    }
-                }
-            }
-        }
+        let rs = rsmake(
+            bonds_to_optimize,
+            &openff_forcefield,
+            angles_to_optimize,
+            propers_to_optimize,
+            config,
+            &pvals0,
+        );
 
         // TODO might have to overwrite with physically-motivated values, but
         // they aren't triggered for the force field I'm testing on
@@ -341,6 +237,127 @@ impl FF {
     pub(crate) fn make_redirect(&self, mvals: Dvec) {
         todo!()
     }
+}
+
+fn rsmake(
+    bonds_to_optimize: Vec<Param>,
+    openff_forcefield: &Option<ForceField>,
+    angles_to_optimize: Vec<Param>,
+    propers_to_optimize: Vec<Param>,
+    config: &Config,
+    pvals0: &Vec<f64>,
+) -> Dvec {
+    // extracting the maximum values of the parameters for computing the
+    // rescaling factors.
+    let mut max_bond = HashMap::new();
+    for (i, param) in bonds_to_optimize.iter().enumerate() {
+        if let Param::Opt { inner } = param {
+            for (_, typ, _unit) in inner {
+                let val = openff_forcefield.as_ref().unwrap().bonds[i]
+                    .as_hash(typ)
+                    .unwrap()
+                    .value
+                    .abs();
+                let cur = max_bond.entry(typ.clone()).or_insert(val);
+                if val > *cur {
+                    *cur = val;
+                }
+            }
+        }
+    }
+
+    let mut max_angle = HashMap::new();
+    for (i, param) in angles_to_optimize.iter().enumerate() {
+        if let Param::Opt { inner } = param {
+            for (_, typ, _unit) in inner {
+                let val = openff_forcefield.as_ref().unwrap().angles[i]
+                    .as_hash(typ)
+                    .unwrap()
+                    .value
+                    .abs();
+                let cur = max_angle.entry(typ.clone()).or_insert(val);
+                if val > *cur {
+                    *cur = val;
+                }
+            }
+        }
+    }
+
+    let mut max_proper = HashMap::new();
+    for (i, param) in propers_to_optimize.iter().enumerate() {
+        if let Param::Opt { inner } = param {
+            for (_, typ, _unit) in inner {
+                let val = openff_forcefield.as_ref().unwrap().proper_torsions
+                    [i]
+                    .as_hash(typ)
+                    .unwrap()
+                    .value
+                    .abs();
+                let cur = max_proper.entry(typ.clone()).or_insert(val);
+                if val > *cur {
+                    *cur = val;
+                }
+            }
+        }
+    }
+
+    // overwrite from priors
+    if let Some(map) = &config.priors {
+        if let Some(bonds) = map.get("bonds") {
+            for (key, value) in bonds {
+                max_bond.insert(key.to_string(), *value);
+            }
+        }
+        if let Some(angles) = map.get("angles") {
+            for (key, value) in angles {
+                max_angle.insert(key.to_string(), *value);
+            }
+        }
+        if let Some(propers) = map.get("propertorsions") {
+            for (key, value) in propers {
+                if key == "k" {
+                    for key in ["k1", "k2", "k3", "k4", "k5", "k6"] {
+                        max_proper.insert(key.to_string(), *value);
+                    }
+                }
+            }
+        }
+    }
+
+    let mut rs = Dvec::from_element(pvals0.len(), 1.0);
+    'outer: for i in 0..pvals0.len() {
+        for bond in &bonds_to_optimize {
+            if let Param::Opt { inner } = bond {
+                for (x, typ, _) in inner {
+                    if *x == i {
+                        rs[i] = *max_bond.get(typ).unwrap();
+                        continue 'outer;
+                    }
+                }
+            }
+        }
+        for angle in &angles_to_optimize {
+            if let Param::Opt { inner } = angle {
+                for (x, typ, _) in inner {
+                    if *x == i {
+                        rs[i] = *max_angle.get(typ).unwrap();
+                        continue 'outer;
+                    }
+                }
+            }
+        }
+        for proper in &propers_to_optimize {
+            if let Param::Opt { inner } = proper {
+                for (x, typ, _) in inner {
+                    if *x == i {
+                        rs[i] = *max_proper.get(typ).unwrap();
+                        continue 'outer;
+                    }
+                }
+            }
+        }
+    }
+    rs
 }
 
 // TODO might be able to factor these out with the use of parameter_handlers
