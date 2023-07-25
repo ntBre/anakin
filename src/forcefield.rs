@@ -109,9 +109,6 @@ pub struct FF {
     /// initial value of physical parameters
     pvals0: Dvec,
 
-    /// dictionary of force field readers
-    readers: HashMap<String, String>,
-
     /// a list of atom names
     atomnames: Vec<String>,
 }
@@ -175,7 +172,6 @@ impl FF {
             excision: Vec::new(),
             np,
             pvals0,
-            readers: todo!(),
             atomnames: todo!(),
         }
     }
