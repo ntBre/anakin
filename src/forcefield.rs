@@ -76,9 +76,6 @@ pub struct FF {
     /// please, please let this be unused.
     ptree: Digraph,
 
-    /// unit strings that might appear in offxml file
-    offxml_unit_strs: HashMap<String, String>,
-
     /// list of rescaling factors
     rs: Vec<f64>,
 
@@ -189,7 +186,6 @@ impl FF {
             offxml: offxml.unwrap(),
             openff_forcefield: openff_forcefield.unwrap(),
             ptree: Digraph,
-            offxml_unit_strs: todo!(),
             rs: todo!(),
             tm: todo!(),
             tmi,
