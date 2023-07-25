@@ -72,9 +72,6 @@ pub struct FF {
 
     openff_forcefield: ForceField,
 
-    /// the listing of parameter number -> atoms involved
-    patoms: Vec<String>,
-
     /// A list where pfields[i] = [pid, 'file', line, field, mult, cmd],
     /// basically a new way to modify force field files; when we modify the
     /// force field file, we go to the specific line/field in a given file and
@@ -197,7 +194,6 @@ impl FF {
             ffdata_isxml,
             offxml: offxml.unwrap(),
             openff_forcefield: openff_forcefield.unwrap(),
-            patoms: todo!(),
             pfields: todo!(),
             ptree: Digraph,
             offxml_unit_strs: todo!(),
