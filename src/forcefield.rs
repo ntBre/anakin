@@ -72,12 +72,6 @@ pub struct FF {
 
     openff_forcefield: ForceField,
 
-    /// the mapping of interaction type -> parameter number
-    map: HashMap<String, String>,
-
-    /// the listing of parameter number -> interaction type
-    plist: Vec<String>,
-
     /// the listing of parameter number -> atoms involved
     patoms: Vec<String>,
 
@@ -203,8 +197,6 @@ impl FF {
             ffdata_isxml,
             offxml: offxml.unwrap(),
             openff_forcefield: openff_forcefield.unwrap(),
-            map: todo!(),
-            plist: Vec::new(),
             patoms: todo!(),
             pfields: todo!(),
             ptree: Digraph,
@@ -235,16 +227,6 @@ impl FF {
         // python version is flat(np.dot(self.tmi, col(mvals)). I might have to
         // flatten the result of the multiplication or something here
         let mut pvals = (&self.tmi * mvals) + &self.pvals0;
-
-        const CONCERN: [&str; 3] = ["polarizability", "epsilon", "VDWT"];
-
-        for i in 0..self.np {
-            if self.plist.iter().any(|j| CONCERN.contains(&j.as_str()))
-                && pvals[i] * self.pvals0[i] < 0.0
-            {
-                pvals[i] = 0.0;
-            }
-        }
 
         // redirect parameters (for the fusion penalty function)
         // TODO another redirect
