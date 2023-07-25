@@ -120,17 +120,6 @@ enum Param {
 
 impl FF {
     pub fn new(config: &Config) -> Self {
-        // TODO clearly this is supposed to have some length
-        let mut pvals0 = Vec::new();
-        // TODO real value here
-        let np = 0;
-        let rs = Dvec::from_element(pvals0.len(), 1.0);
-        let qmat2 = Dmat::identity(np, np);
-        // TODO qmat2 needs to be set for real
-        let transmat = qmat2 * Dmat::from_diagonal(&rs);
-        let tmi = transmat.transpose();
-        let fnms = config.forcefield.clone();
-
         // combination of addff and addff_xml in python version
         let mut forcefields = Vec::new();
         let mut offxml = None;
@@ -140,6 +129,8 @@ impl FF {
         let mut bonds_to_optimize = Vec::new();
         let mut angles_to_optimize = Vec::new();
         let mut propers_to_optimize = Vec::new();
+        let mut pvals0 = Vec::new();
+        let fnms = config.forcefield.clone();
         for fnm in &fnms {
             offxml = Some(fnm.clone());
             let ff_file = &ffdir.join(fnm);
@@ -164,8 +155,6 @@ impl FF {
             forcefields.push(ff);
         }
 
-        dbg!(pvals0.len());
-
         let rs = rsmake(
             bonds_to_optimize,
             &openff_forcefield,
@@ -174,6 +163,15 @@ impl FF {
             config,
             &pvals0,
         );
+
+        let np = pvals0.len();
+
+        // TODO real value here
+        let rs = Dvec::from_element(pvals0.len(), 1.0);
+        let qmat2 = Dmat::identity(np, np);
+        // TODO qmat2 needs to be set for real
+        let transmat = qmat2 * Dmat::from_diagonal(&rs);
+        let tmi = transmat.transpose();
 
         // TODO might have to overwrite with physically-motivated values, but
         // they aren't triggered for the force field I'm testing on
