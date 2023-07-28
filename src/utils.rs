@@ -1,6 +1,6 @@
 use nalgebra::SVD;
 
-use crate::Dmat;
+use crate::{Dmat, Dvec};
 
 /// compute the population standard deviation of `hist`
 pub(crate) fn std_dev(hist: &[f64]) -> f64 {
@@ -41,10 +41,17 @@ pub(crate) fn invert_svd(h: Dmat) -> Dmat {
     v * si * uh
 }
 
+/// Given two vectors `v1` and `v2`, project out the component of `v1` that is
+/// along the `v2` direction
+pub(crate) fn orthogonalize(v1: Dvec, v2: Dvec) -> Dvec {
+    let v2u = &v2 / v2.norm();
+    &v1 - &v2u * (v1.dot(&v2u))
+}
+
 #[cfg(test)]
 mod tests {
     use approx::assert_abs_diff_eq;
-    use nalgebra::dmatrix;
+    use nalgebra::{dmatrix, dvector};
 
     use super::*;
 
@@ -77,6 +84,15 @@ mod tests {
             -0.15791544, -0.18541514,  0.13327825, -0.27297548, -0.16557467, -0.20425462, -0.08803939, -0.16444261,  0.12128662;
             -0.19306354, -0.14504148, -0.06447834, -0.16048321, -0.25867453, -0.01536834, -0.1388115 ,  0.14817648, -0.08114219;
         ];
+        assert_abs_diff_eq!(got, want, epsilon = 1e-8);
+    }
+
+    #[test]
+    fn test_orthogonalize() {
+        let v1 = dvector![1.0, 2.0, 3.0];
+        let v2 = dvector![4.0, 5.0, 6.0];
+        let got = orthogonalize(v1, v2);
+        let want = dvector![-0.66233766, -0.07792208, 0.50649351];
         assert_abs_diff_eq!(got, want, epsilon = 1e-8);
     }
 }
