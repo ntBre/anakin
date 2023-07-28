@@ -5,7 +5,7 @@ use std::{
 
 use openff_toolkit::smirnoff::{ForceField, Unit};
 
-use crate::{config::Config, Dmat, Dvec};
+use crate::{config::Config, utils::orthogonalize, Dmat, Dvec};
 
 mod utils;
 
@@ -170,9 +170,89 @@ impl FF {
 
         let np = pvals0.len();
 
+        // begin mktransmat
+
+        let mut qmap: Vec<usize> = Vec::new();
+        let mut qid: Vec<Vec<usize>> = Vec::new();
+        let mut qid2: Vec<Vec<usize>> = Vec::new();
+        let qnr = 1;
+        let mut qmat2 = Dmat::identity(np, np);
+
+        // he really loves these nested functions. TODO pull these out as
+        // standalone functions
+        let insert_mat = |qtrans2: Dmat, qmap: Vec<usize>| {
+            let mut x = 0;
+            for i in 0..np {
+                if qmap.contains(&i) {
+                    let mut y = 0;
+                    for &j in &qmap {
+                        qmat2[(i, j)] = qtrans2[(x, y)];
+                        y += 1;
+                    }
+                    x += 1;
+                }
+            }
+        };
+
+        let build_qtrans2 = |tq, qid: Vec<Vec<usize>>, qmap: Vec<usize>| {
+            let nq = qmap.len();
+            // tq = Total number of atomic charges that are being optimized on
+            // the molecule NOTE: This may be greater than the number of charge
+            // parameters (nq) The reason for the "one" here is because LP
+            // wanted to have multiple charge constraints at some point in the
+            // future
+
+            const ONE: usize = 1;
+
+            let cons0 = Dmat::from_element(ONE, tq, 1.0);
+            // in python, the first dimension is cons0.shape[0], but we just
+            // hard-coded that to 1 right??
+            let mut cons = Dmat::zeros(ONE, nq);
+            let mut qtrans2 = Dmat::identity(nq, nq);
+
+            // again, this uses cons.shape[0], but we set it to 1 !
+            for i in 0..ONE {
+                // cons.shape[1] but we know what that is from a few lines back
+                for j in 0..nq {
+                    // BRW: not sure if this is still relevant, but copying from
+                    // Python just in case:
+                    //
+                    // Each element of qid is a list that points to atom
+                    // indices. LPW: This code is breaking when we're not
+                    // optimizing ALL the charges Replace cons0[i][k-1] with all
+                    // ones cons[i][j] = sum([cons0[i][k-1] for k in qid[j]])
+                    cons[(i, j)] = qid[j].len() as f64;
+                }
+                let n = cons.row(i).norm();
+                let mut row = cons.row_mut(i);
+                row /= n;
+                for j in 0..i {
+                    let o = orthogonalize(
+                        cons.row(i).transpose(),
+                        cons.row(j).transpose(),
+                    )
+                    .transpose();
+                    cons.set_row(i, &o);
+                }
+                let mut row = qtrans2.row_mut(i);
+                row.fill(0.0);
+                for j in 0..nq - i - 1 {
+                    let o = orthogonalize(
+                        qtrans2.row(i + j + 1).transpose(),
+                        cons.row(i).transpose(),
+                    )
+                    .transpose();
+                    qtrans2.set_row(i + j + 1, &o);
+                }
+            }
+
+            qtrans2
+        };
+
+        // end mktransmat
+
         // TODO real value here
         let rs = Dvec::from_element(pvals0.len(), 1.0);
-        let qmat2 = Dmat::identity(np, np);
         // TODO qmat2 needs to be set for real
         let transmat = qmat2 * Dmat::from_diagonal(&rs);
         let tmi = transmat.transpose();
