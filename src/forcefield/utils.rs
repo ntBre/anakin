@@ -5,10 +5,10 @@ use openff_toolkit::smirnoff::ForceField;
 use crate::{config::Config, forcefield::Param, Dvec};
 
 pub(super) fn rsmake(
-    bonds_to_optimize: Vec<Param>,
+    bonds_to_optimize: &[Param],
     openff_forcefield: &Option<ForceField>,
-    angles_to_optimize: Vec<Param>,
-    propers_to_optimize: Vec<Param>,
+    angles_to_optimize: &[Param],
+    propers_to_optimize: &[Param],
     config: &Config,
     pvals0: &Vec<f64>,
 ) -> Dvec {
@@ -91,7 +91,7 @@ pub(super) fn rsmake(
 
     let mut rs = Dvec::from_element(pvals0.len(), 1.0);
     'outer: for i in 0..pvals0.len() {
-        for bond in &bonds_to_optimize {
+        for bond in bonds_to_optimize {
             if let Param::Opt { inner } = bond {
                 for (x, typ, _) in inner {
                     if *x == i {
@@ -101,7 +101,7 @@ pub(super) fn rsmake(
                 }
             }
         }
-        for angle in &angles_to_optimize {
+        for angle in angles_to_optimize {
             if let Param::Opt { inner } = angle {
                 for (x, typ, _) in inner {
                     if *x == i {
@@ -111,7 +111,7 @@ pub(super) fn rsmake(
                 }
             }
         }
-        for proper in &propers_to_optimize {
+        for proper in propers_to_optimize {
             if let Param::Opt { inner } = proper {
                 for (x, typ, _) in inner {
                     if *x == i {
