@@ -249,12 +249,27 @@ impl FF {
             qtrans2
         };
 
+        // TODO could need to build a charge constraint for each molecule. we
+        // don't enter this for the case I'm looking at, maybe not SMIRNOFF in
+        // general?
+
+        let transmat = &qmat2 * Dmat::from_diagonal(&rs);
+        let mut transmat1 = Dmat::zeros(np, np);
+        // he says "this matrix multiplication doesn't work!! I will proceed
+        // using loops" wtf could that possibly mean?
+        for i in 0..np {
+            for k in 0..np {
+                transmat1[(i, k)] = qmat2[(i, k)] * rs[k];
+            }
+        }
+
+        println!("{:.8}", (&transmat - transmat1).max());
+
         // end mktransmat
 
         // TODO real value here
         let rs = Dvec::from_element(pvals0.len(), 1.0);
         // TODO qmat2 needs to be set for real
-        let transmat = qmat2 * Dmat::from_diagonal(&rs);
         let tmi = transmat.transpose();
 
         // TODO might have to overwrite with physically-motivated values, but
