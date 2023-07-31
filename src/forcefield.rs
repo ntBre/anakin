@@ -254,16 +254,6 @@ impl FF {
         // general?
 
         let transmat = &qmat2 * Dmat::from_diagonal(&rs);
-        let mut transmat1 = Dmat::zeros(np, np);
-        // he says "this matrix multiplication doesn't work!! I will proceed
-        // using loops" wtf could that possibly mean?
-        for i in 0..np {
-            for k in 0..np {
-                transmat1[(i, k)] = qmat2[(i, k)] * rs[k];
-            }
-        }
-
-        println!("{:.8}", (&transmat - transmat1).max());
 
         // end mktransmat
 
