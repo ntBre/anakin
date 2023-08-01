@@ -134,10 +134,6 @@ pub struct Config {
     #[serde(default)]
     pub(crate) use_pvals: bool,
 
-    /// Execute Work Queue tasks and local calculations asynchronously for
-    /// improved speed
-    asynchronous: bool,
-
     /// Re-evaluate the objective function and gradients when the step is
     /// rejected (for noisy objective functions).
     #[serde(default)]

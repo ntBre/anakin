@@ -106,9 +106,6 @@ pub struct Objective {
     /// it an Option depending on how it's used
     obj_map: HashMap<String, Regularization>,
 
-    // I might never use this
-    asynchronous: bool,
-
     /// assuming this means total weight
     wtot: f64,
 }
@@ -140,7 +137,6 @@ impl Objective {
             targets: Vec::new(),
             obj_map: HashMap::new(),
             penalty,
-            asynchronous: false,
             // TODO should be some of weights from targets
             wtot: 1.0,
             normalize_weights: config.normalize_weights,
@@ -181,31 +177,27 @@ impl Objective {
             tgt.stage(mvals.clone(), order >= 1, order >= 2);
         }
 
-        if self.asynchronous {
-            todo!();
-        } else {
-            // TODO might be supposed to use an existing work queue. see
-            // nifty/getWorkQueue at some point. this might even be a psqs
-            // situation.
-            let wq = WorkQueue::new();
-            for tgt in self.targets.iter_mut() {
-                tgt.save = true;
-                let ans: Extra = match order {
-                    0 => tgt.get_x(&mvals),
-                    1 => tgt.get_g(&mvals),
-                    2 => tgt.get_h(&mvals),
-                    _ => unimplemented!(),
-                };
-                if !in_fd() {
-                    self.obj_map.insert(
-                        tgt.name.clone(),
-                        Regularization::new(tgt.weight / self.wtot, ans.0),
-                    );
-                }
-                objective.x += ans.0 * tgt.weight / self.wtot;
-                objective.g += ans.1 * tgt.weight / self.wtot;
-                objective.h += ans.2 * tgt.weight / self.wtot;
+        // TODO might be supposed to use an existing work queue. see
+        // nifty/getWorkQueue at some point. this might even be a psqs
+        // situation.
+        let wq = WorkQueue::new();
+        for tgt in self.targets.iter_mut() {
+            tgt.save = true;
+            let ans: Extra = match order {
+                0 => tgt.get_x(&mvals),
+                1 => tgt.get_g(&mvals),
+                2 => tgt.get_h(&mvals),
+                _ => unimplemented!(),
+            };
+            if !in_fd() {
+                self.obj_map.insert(
+                    tgt.name.clone(),
+                    Regularization::new(tgt.weight / self.wtot, ans.0),
+                );
             }
+            objective.x += ans.0 * tgt.weight / self.wtot;
+            objective.g += ans.1 * tgt.weight / self.wtot;
+            objective.h += ans.2 * tgt.weight / self.wtot;
         }
 
         for tgt in self.targets.iter_mut() {
