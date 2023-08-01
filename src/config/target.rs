@@ -1,9 +1,260 @@
 use serde::Deserialize;
 
+#[derive(Debug, Deserialize)]
+enum TargetType {
+    #[serde(alias = "TorsionProfile_SMIRNOFF")]
+    Torsion,
+    #[serde(alias = "OptGeoTarget_SMIRNOFF")]
+    OptGeo,
+}
+
 /// struct corresponding to tgt_opts in ForceBalance
 #[derive(Debug, Deserialize)]
 pub(crate) struct Target {
     name: String,
+
+    #[serde(rename = "type")]
+    typ: TargetType,
+
+    /// The resolution of mapping interactions to net forces and torques for
+    /// groups of atoms. In order of resolution: molecule > residue >
+    /// charge-group
+    #[serde(default = "default_force_map")]
+    force_map: String,
+
+    /// Interaction fragment 1: a selection of atoms specified using atoms and
+    /// dashes, e.g. 1-6 to select the first through sixth atom (i.e. list
+    /// numbering starts from 1)
+    #[serde(default)]
+    fragment1: String,
+
+    /// Interaction fragment 2: a selection of atoms specified using atoms and
+    /// dashes, e.g. 7-11 to select atoms 7 through 11.
+    #[serde(default)]
+    fragment2: String,
+
+    /// Precision of OpenMM calculation if using CUDA or OpenCL platform. Choose
+    /// either single, double or mixed ; defaults to the OpenMM default.
+    #[serde(default)]
+    openmm_precision: Option<String>,
+
+    /// OpenMM platform. Choose either Reference, CUDA or OpenCL. AMOEBA is on
+    /// Reference or CUDA only.
+    #[serde(default)]
+    openmm_platform: Option<String>,
+
+    /// Text file containing quantum data. If not provided, will search for a
+    /// default (qdata.txt).
+    #[serde(default)]
+    qdata_txt: Option<String>,
+
+    /// Text file containing interacting systems. If not provided, will search
+    /// for a default.
+    #[serde(default = "default_inter_txt")]
+    inter_txt: String,
+
+    /// Text file containing extra options for Optimized Geometry target. If not
+    /// provided, will search for a default.
+    #[serde(default = "default_optgeo_options_txt")]
+    optgeo_options_txt: String,
+
+    /// Reassign modes before fitting frequencies, using either linear
+    /// assignment "permute" or maximum overlap "overlap".
+    #[serde(default)]
+    reassign_modes: Option<String>,
+
+    /// Provide file name for condensed phase coordinates.
+    #[serde(default)]
+    liquid_coords: Option<String>,
+
+    /// Provide file name for gas phase coordinates.
+    #[serde(default)]
+    gas_coords: Option<String>,
+
+    /// Provide file name for condensed phase NVT coordinates.
+    #[serde(default)]
+    nvt_coords: Option<String>,
+
+    /// Provide file name for lipid coordinates.
+    #[serde(default)]
+    lipid_coords: Option<String>,
+
+    /// Coordinates for single point evaluation; if not provided, will search
+    /// for a default.
+    #[serde(default)]
+    coords: Option<String>,
+
+    /// PDB file mainly used for building OpenMM and AMBER systems.
+    #[serde(default)]
+    pdb: Option<String>,
+
+    /// MOL2 file needed to set up the system (in addition to any specified
+    /// under forcefield). NOTE: this is a list in Python, but we seem to use
+    /// only single ones so far
+    #[serde(default)]
+    mol2: Option<String>,
+
+    /// Gromacs .mdp files. If not provided, will search for default.
+    #[serde(default)]
+    gmx_mdp: Option<String>,
+
+    /// Gromacs .top files. If not provided, will search for default.
+    #[serde(default)]
+    gmx_top: Option<String>,
+
+    /// Gromacs .ndx files. If not provided, will search for default.
+    #[serde(default)]
+    gmx_ndx: Option<String>,
+
+    /// File containing commands for "tleap" when setting up AMBER simulations.
+    #[serde(default)]
+    amber_leapcmd: Option<String>,
+
+    /// TINKER .key files. If not provided, will search for default.
+    #[serde(default)]
+    tinker_key: Option<String>,
+
+    /// Text file containing experimental data.
+    #[serde(default = "default_expdata_txt")]
+    expdata_txt: String,
+
+    /// Text file containing experimental data.
+    #[serde(default = "default_hfedata_txt")]
+    hfedata_txt: String,
+
+    /// Method for calculating hydration energies (single point, FEP, TI).
+    #[serde(default = "default_hfemode")]
+    hfemode: String,
+
+    /// Provide a temporary directory ".tmp" to read data from a previous
+    /// calculation on the initial iteration (for instance, to restart an
+    /// aborted run).
+    #[serde(default)]
+    read: Option<String>,
+
+    /// Specify an optional prefix script to run in front of rtarget.py, for
+    /// loading environment variables
+    #[serde(default)]
+    remote_prefix: String,
+
+    /// Number of fitting atoms; defaults to all of them. Use a comma and dash
+    /// style list (1,2-5), atoms numbered from one, inclusive
+    #[serde(default)]
+    fitatoms: Option<String>,
+
+    /// Specify a subset of molecules to fit. The rest are used for
+    /// cross-validation.
+    #[serde(default)]
+    subset: Option<String>,
+
+    /// Name of the barostat to use for equilibration.
+    #[serde(default = "default_gmx_eq_barostat")]
+    gmx_eq_barostat: String,
+
+    /// JSON file containing options for the OpenFF Evaluator target. If not
+    /// provided, will search for a default.
+    #[serde(default = "default_evaluator_input")]
+    evaluator_input: String,
+
+    /// A SQLite database containing the electrostatic property data to train
+    /// against.
+    #[serde(default = "default_recharge_esp_store")]
+    recharge_esp_store: String,
+
+    /// The type of electrostatic property to train against [esp,
+    /// electric-field].
+    #[serde(default = "default_recharge_property")]
+    recharge_property: String,
+
+    /// How to treat relative (MM-QM) energies. "average": Subtract out the mean
+    /// gap (default). "qm_minimum": Reference all MM and QM energies to the
+    /// structure with minimum QM energy. "absolute": Use absolute energies in
+    /// fitting, do not subtract out any energy gap.
+    #[serde(default = "default_energy_mode")]
+    energy_mode: String,
+
+    /// Number of snapshots; defaults to all of the snapshots
+    #[serde(default)]
+    shots: Option<usize>,
+
+    /// Wait a number of seconds every time this target is visited (gives me a
+    /// chance to ctrl+C)
+    #[serde(default = "default_sleepy")]
+    sleepy: usize,
+
+    /// Number of time steps for the liquid production run.
+    #[serde(default = "default_liquid_md_steps")]
+    liquid_md_steps: usize,
+
+    /// Number of time steps for the liquid equilibration run.
+    #[serde(default = "default_liquid_eq_steps")]
+    liquid_eq_steps: usize,
+
+    /// Number of time steps for the lipid production run.
+    #[serde(default = "default_lipid_md_steps")]
+    lipid_md_steps: usize,
+
+    /// Number of time steps for the lipid equilibration run.
+    #[serde(default = "default_lipid_eq_steps")]
+    lipid_eq_steps: usize,
+
+    /// Number of steps in the liquid simulation between MC barostat volume
+    /// adjustments.
+    #[serde(default = "default_n_mcbarostat")]
+    n_mcbarostat: usize,
+
+    /// Number of time steps for the gas production run, if different from
+    /// default.
+    #[serde(default = "default_gas_md_steps")]
+    gas_md_steps: usize,
+
+    /// Number of time steps for the gas equilibration run, if different from
+    /// default.
+    #[serde(default = "default_gas_eq_steps")]
+    gas_eq_steps: usize,
+
+    /// Number of time steps for the liquid NVT production run.
+    #[serde(default = "default_nvt_md_steps")]
+    nvt_md_steps: usize,
+
+    /// Number of time steps for the liquid NVT equilibration run.
+    #[serde(default = "default_nvt_eq_steps")]
+    nvt_eq_steps: usize,
+
+    /// Affects the amount of data being printed to the temp directory.
+    #[serde(default = "default_writelevel")]
+    writelevel: usize,
+
+    /// Set the number of threads used by Gromacs or TINKER processes in MD
+    /// simulations
+    #[serde(default = "default_md_threads")]
+    md_threads: usize,
+
+    /// Whether to save trajectories. 0 = Never save; 1 = Delete if optimization
+    /// step is good; 2 = Always save
+    #[serde(default = "default_save_traj")]
+    save_traj: usize,
+
+    /// Number of time steps for the equilibration run.
+    #[serde(default = "default_eq_steps")]
+    eq_steps: usize,
+
+    /// Number of time steps for the production run.
+    #[serde(default = "default_md_steps")]
+    md_steps: usize,
+
+    /// Number of simulations required to calculate quantities.
+    #[serde(default = "default_n_sim_chain")]
+    n_sim_chain: usize,
+
+    /// Provide the number of molecules in the structure (defaults to
+    /// auto-detect).
+    #[serde(default)]
+    n_molecules: Option<usize>,
+
+    /// Specify an hessian target objective function normalization method.
+    #[serde(default = "default_hess_normalize_type")]
+    hess_normalize_type: usize,
 
     /// Weight of the target (determines its importance vs. other targets)
     #[serde(default = "default_weight")]
@@ -360,4 +611,116 @@ fn default_liquid_fdiff_h() -> f64 {
 
 fn default_restrain_k() -> f64 {
     1.0
+}
+
+fn default_force_map() -> String {
+    String::from("residue")
+}
+
+fn default_inter_txt() -> String {
+    String::from("interactions.txt")
+}
+
+fn default_optgeo_options_txt() -> String {
+    String::from("optgeo_options.txt")
+}
+
+fn default_gmx_eq_barostat() -> String {
+    String::from("berendsen")
+}
+
+fn default_evaluator_input() -> String {
+    String::from("evaluator_input.json")
+}
+
+fn default_recharge_esp_store() -> String {
+    String::from("esp-store.sqlite")
+}
+
+fn default_recharge_property() -> String {
+    String::from("esp")
+}
+
+fn default_energy_mode() -> String {
+    String::from("average")
+}
+
+fn default_expdata_txt() -> String {
+    String::from("expset.txt")
+}
+
+fn default_hfedata_txt() -> String {
+    String::from("hfedata.txt")
+}
+
+fn default_hfemode() -> String {
+    String::from("single")
+}
+
+fn default_sleepy() -> usize {
+    0
+}
+
+fn default_liquid_md_steps() -> usize {
+    10000
+}
+
+fn default_liquid_eq_steps() -> usize {
+    1000
+}
+
+fn default_lipid_md_steps() -> usize {
+    10000
+}
+
+fn default_lipid_eq_steps() -> usize {
+    1000
+}
+
+fn default_n_mcbarostat() -> usize {
+    25
+}
+
+fn default_gas_md_steps() -> usize {
+    100000
+}
+
+fn default_gas_eq_steps() -> usize {
+    10000
+}
+
+fn default_nvt_md_steps() -> usize {
+    100000
+}
+
+fn default_nvt_eq_steps() -> usize {
+    10000
+}
+
+fn default_writelevel() -> usize {
+    0
+}
+
+fn default_md_threads() -> usize {
+    1
+}
+
+fn default_save_traj() -> usize {
+    0
+}
+
+fn default_eq_steps() -> usize {
+    20000
+}
+
+fn default_md_steps() -> usize {
+    50000
+}
+
+fn default_n_sim_chain() -> usize {
+    1
+}
+
+fn default_hess_normalize_type() -> usize {
+    0
 }
