@@ -1,15 +1,15 @@
-use std::cell::RefCell;
+use std::{boxed::Box, cell::RefCell};
+
+use log::debug;
 
 use crate::{
     forcefield::FF,
     objective::{penalty::PenaltyType, ObjMap, Objective},
-    optimizer::solvers::{hyper_solver, para_solver},
     utils::{invert_svd, std_dev},
     Dmat, Dvec,
 };
 
 mod optimize;
-mod solvers;
 
 /// a struct representing all possible convergence criteria
 struct Criteria {
@@ -38,7 +38,7 @@ pub struct Optimizer {
 
     trust0: f64,
     adapt_fac: f64,
-    mvals0: Vec<f64>,
+    mvals0: Dvec,
 
     /// initial step size for numerical finite difference
     h0: f64,
@@ -113,6 +113,7 @@ pub struct Optimizer {
 
 impl Optimizer {
     pub fn new(objective: Objective, forcefield: FF) -> Self {
+        let np = forcefield.np;
         Self {
             objective: RefCell::new(objective),
             forcefield,
@@ -125,8 +126,8 @@ impl Optimizer {
             convergence_objective: 1e-4,
             iteration: 0,
             good_step: false,
-            mvals0: Vec::new(), // TODO option? or empty vector enough
-            h0: 0.001,          // taken from finite_difference_h config
+            mvals0: Dvec::zeros(np),
+            h0: 0.001, // taken from finite_difference_h config
             h: 0.001,
             fdf: 0.1,
             iter_init: 0,
@@ -151,10 +152,12 @@ impl Optimizer {
     pub fn run(&mut self) {
         // TODO can call the appropriate optimizer here. in my case it's
         // OPTIMIZE, which calls NewtonRaphson
+        debug!("calling newton_raphson from Optimizer::run");
         self.newton_raphson();
     }
 
     fn newton_raphson(&mut self) {
+        debug!("calling main_optimizer from newton_raphson");
         self.main_optimizer(false);
     }
 
@@ -227,6 +230,8 @@ impl Optimizer {
         // convergence criteria
         let mut criteria_satisfied = Criteria::new();
 
+        debug!("entering non-linear iterations");
+
         // non-linear iterations
         let mut x_prev = 0.0;
         let mut xk_prev = Dvec::zeros(0);
@@ -255,8 +260,11 @@ impl Optimizer {
 
             ObjMap { x, g, h, .. } = data.clone();
 
+            debug!("assessing optimization step");
+
             // assess optimization step
             if self.iteration > self.iter_init {
+                debug!("self.iteration > self.iter_init");
                 let dx_actual = x - x_prev;
                 // true if x < best step in history
                 let mut best_step = x < *x_hist[best_start..]
@@ -408,6 +416,8 @@ impl Optimizer {
                 break;
             }
 
+            debug!("updating variables before the next step");
+
             // update optimization variables before the next step
 
             // previous data from objective function call
@@ -421,8 +431,13 @@ impl Optimizer {
             // previous physical parameters
             pk_prev = self.forcefield.create_pvals(xk.clone());
 
+            debug!("calculating optimization step");
+
             // calculate optimization step
             (dx, dx_expect, bump) = self.step(xk.clone(), data, trust);
+
+            debug!("end of step");
+
             xk += &dx;
             ndx = dx.norm();
 
@@ -465,7 +480,11 @@ impl Optimizer {
             }
 
             // TODO write checkpoint
+
+            debug!("end of loop");
         }
+
+        debug!("assessing convergence");
 
         let cnvgd = criteria_satisfied.sum() >= self.criteria;
         if cnvgd {
@@ -560,7 +579,30 @@ impl Optimizer {
             }
         }
 
-        let solver = if bhyp { hyper_solver } else { para_solver };
+        let para_solver = Box::new(|l: f64| {
+            debug!("calling para_solver");
+            let hl = h.len();
+            let (r, c) = h.shape();
+            debug!("size of h is {r} x {c}");
+            let ht = &h + (l - 1.0).powi(2) * Dmat::identity(r, r);
+            debug!("inverting ht");
+            let hi = invert_svd(ht);
+            debug!("{:?}", g.shape());
+            let mut dx = -1.0 * (hi * &g);
+            let sol =
+                (0.5 * dx.transpose() * &h * &dx)[0] + (dx.transpose() * &g)[0];
+            for i in &self.forcefield.excision {
+                dx = dx.insert_row(*i, 0.0);
+            }
+            (dx, sol)
+        });
+
+        let hyper_solver = Box::new(|l: f64| todo!());
+
+        let solver: Box<dyn Fn(f64) -> (Dvec, f64)> =
+            if bhyp { hyper_solver } else { para_solver };
+
+        debug!("initialized solvers");
 
         // TODO counting micro iterations
 
@@ -569,6 +611,8 @@ impl Optimizer {
             let d = n - trust;
             d * d
         };
+
+        debug!("initialized trust_fun");
 
         // evaluate ONLY the objective function. most useful when the objective
         // is cheap, but the derivative is expensive
@@ -585,17 +629,23 @@ impl Optimizer {
             result
         };
 
+        debug!("initialized search_fun");
+
         let h_fun = |l| {
             let n = solver(l).0.norm();
             let d = n - self.h;
             d * d
         };
 
+        debug!("initialized h_fun");
+
         let mut bump = false;
         let (mut dx, mut expect);
         if self.trust0 > 0.0 {
+            debug!("entering trust region code");
             // trust region code
             (dx, expect) = solver(1.0);
+            debug!("finished solver");
             let dxnorm = dx.norm();
             if dxnorm > trust {
                 bump = true;
@@ -610,6 +660,7 @@ impl Optimizer {
                 let dxnorm = dx.norm();
             } // else we found the step
         } else {
+            debug!("entering search code");
             // search code
 
             // first obtain a step that is roughly the same length as the
@@ -648,11 +699,10 @@ impl Optimizer {
             // optimization step found
         }
 
-        use PenaltyType::*;
         // TODO is_fuse() ?
         if matches!(
             self.objective.borrow().penalty.ptype,
-            Fuse | FuseL0 | FuseBarrier
+            PenaltyType::Fuse | PenaltyType::FuseL0 | PenaltyType::FuseBarrier
         ) {
             self.forcefield.make_redirect(&dx + xk);
         }
