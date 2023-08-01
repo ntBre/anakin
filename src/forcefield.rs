@@ -250,9 +250,8 @@ fn mktransmat(np: usize, rs: &Dvec) -> (Dmat, Vec<usize>, Dmat) {
         for i in 0..np {
             if qmap.contains(&i) {
                 let mut y = 0;
-                for &j in &qmap {
+                for (y, &j) in qmap.iter().enumerate() {
                     qmat2[(i, j)] = qtrans2[(x, y)];
-                    y += 1;
                 }
                 x += 1;
             }
