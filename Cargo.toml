@@ -11,6 +11,8 @@ serde = { version = "1.0.175", features = ["derive"] }
 toml = "0.7.6"
 
 openff-toolkit = { path = "../openff-toolkit" }
+env_logger = "0.10.0"
+log = "0.4.19"
 
 [dev-dependencies]
 approx = "0.5.1"
