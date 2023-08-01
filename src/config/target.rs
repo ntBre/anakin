@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
-enum TargetType {
+pub(crate) enum TargetType {
     #[serde(alias = "TorsionProfile_SMIRNOFF")]
     Torsion,
     #[serde(alias = "OptGeoTarget_SMIRNOFF")]
@@ -11,10 +11,10 @@ enum TargetType {
 /// struct corresponding to tgt_opts in ForceBalance
 #[derive(Debug, Deserialize)]
 pub(crate) struct Target {
-    name: String,
+    pub(crate) name: String,
 
     #[serde(rename = "type")]
-    typ: TargetType,
+    pub(crate) typ: TargetType,
 
     /// The resolution of mapping interactions to net forces and torques for
     /// groups of atoms. In order of resolution: molecule > residue >
@@ -36,12 +36,12 @@ pub(crate) struct Target {
     /// Precision of OpenMM calculation if using CUDA or OpenCL platform. Choose
     /// either single, double or mixed ; defaults to the OpenMM default.
     #[serde(default)]
-    openmm_precision: Option<String>,
+    pub(crate) openmm_precision: Option<String>,
 
     /// OpenMM platform. Choose either Reference, CUDA or OpenCL. AMOEBA is on
     /// Reference or CUDA only.
     #[serde(default)]
-    openmm_platform: Option<String>,
+    pub(crate) openmm_platform: Option<String>,
 
     /// Text file containing quantum data. If not provided, will search for a
     /// default (qdata.txt).
@@ -82,17 +82,17 @@ pub(crate) struct Target {
     /// Coordinates for single point evaluation; if not provided, will search
     /// for a default.
     #[serde(default)]
-    coords: Option<String>,
+    pub(crate) coords: Option<String>,
 
     /// PDB file mainly used for building OpenMM and AMBER systems.
     #[serde(default)]
-    pdb: Option<String>,
+    pub(crate) pdb: Option<String>,
 
     /// MOL2 file needed to set up the system (in addition to any specified
     /// under forcefield). NOTE: this is a list in Python, but we seem to use
     /// only single ones so far
     #[serde(default)]
-    mol2: Option<String>,
+    pub(crate) mol2: Option<String>,
 
     /// Gromacs .mdp files. If not provided, will search for default.
     #[serde(default)]
@@ -130,7 +130,7 @@ pub(crate) struct Target {
     /// calculation on the initial iteration (for instance, to restart an
     /// aborted run).
     #[serde(default)]
-    read: Option<String>,
+    pub(crate) read: Option<String>,
 
     /// Specify an optional prefix script to run in front of rtarget.py, for
     /// loading environment variables
@@ -180,7 +180,7 @@ pub(crate) struct Target {
     /// Wait a number of seconds every time this target is visited (gives me a
     /// chance to ctrl+C)
     #[serde(default = "default_sleepy")]
-    sleepy: usize,
+    pub(crate) sleepy: usize,
 
     /// Number of time steps for the liquid production run.
     #[serde(default = "default_liquid_md_steps")]
@@ -223,7 +223,7 @@ pub(crate) struct Target {
 
     /// Affects the amount of data being printed to the temp directory.
     #[serde(default = "default_writelevel")]
-    writelevel: usize,
+    pub(crate) writelevel: usize,
 
     /// Set the number of threads used by Gromacs or TINKER processes in MD
     /// simulations
@@ -258,17 +258,17 @@ pub(crate) struct Target {
 
     /// Weight of the target (determines its importance vs. other targets)
     #[serde(default = "default_weight")]
-    weight: f64,
+    pub(crate) weight: f64,
 
     /// Energy denominator in kcal/mol for objective function and lower energy
     /// limit for attenuating weights where applicable
     #[serde(default = "default_energy_denom")]
-    energy_denom: f64,
+    pub(crate) energy_denom: f64,
 
     /// Upper energy cutoff in kcal/mol for setting weights to zero, used to
     /// exclude super-repulsive interactions
     #[serde(default = "default_energy_upper")]
-    energy_upper: f64,
+    pub(crate) energy_upper: f64,
 
     /// Weight of experimental density
     #[serde(default = "default_w_rho")]
@@ -420,7 +420,7 @@ pub(crate) struct Target {
 
     /// Gradient below this threshold will be set to zero.
     #[serde(default = "default_epsgrad")]
-    epsgrad: f64,
+    pub(crate) epsgrad: f64,
 
     /// Snapshots with (E_MM - E_QM) < 0.0 will have their weights increased by
     /// this factor. Only valid if energy_mode is set to "qm_minimum".
@@ -443,22 +443,22 @@ pub(crate) struct Target {
 
     /// Force constant for harmonic positional energy restraints
     #[serde(default = "default_restrain_k")]
-    restrain_k: f64,
+    pub(crate) restrain_k: f64,
 
     /// Finite difference gradient of objective function w/r.t. specified
     /// parameters
     #[serde(default)]
-    fdgrad: bool,
+    pub(crate) fdgrad: bool,
 
     /// Finite difference Hessian of objective function w/r.t. specified
     /// parameters
     #[serde(default)]
-    fdhess: bool,
+    pub(crate) fdhess: bool,
 
     /// Finite difference Hessian diagonals w/r.t. specified parameters (costs
     /// 2np times a objective calculation)
     #[serde(default)]
-    fdhessdiag: bool,
+    pub(crate) fdhessdiag: bool,
 
     /// Compute all energies and forces in one fell swoop where possible(as
     /// opposed to calling the simulation code once per snapshot)
@@ -493,7 +493,7 @@ pub(crate) struct Target {
     /// Normalize interaction energies using 1/sqrt(denom**2 + (E(qm)-denom)**2)
     /// for energies more positive than denom.
     #[serde(default)]
-    attenuate: bool,
+    pub(crate) attenuate: bool,
 
     /// Divide objective function by the number of snapshots / vibrations
     #[serde(default)]

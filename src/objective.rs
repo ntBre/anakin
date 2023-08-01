@@ -1,27 +1,165 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
+
+use log::{debug, error};
+use serde::Deserialize;
 
 use crate::{
-    config::Config, forcefield::FF, work_queue::WorkQueue, Dmat, Dvec,
+    config::{self, Config},
+    forcefield::FF,
+    work_queue::WorkQueue,
+    Dmat, Dvec,
 };
 
 use self::penalty::{Penalty, PenaltyType};
 
 pub(crate) mod penalty;
 
-pub(crate) struct Target {
-    pub(crate) good_step: bool,
+#[derive(Deserialize)]
+struct Metadata {
+    dihedrals: Vec<Vec<usize>>,
+    grid_spacing: Vec<usize>,
+    dihedral_ranges: Option<usize>,
+    energy_decrease_thresh: Option<f64>,
+    energy_upper_limit: f64,
+    torsion_grid_ids: Vec<Vec<isize>>,
+}
 
-    /// current step size for finite differences
+enum TargetType {
+    // TODO some of these are likely shared options. I've seen at least
+    // writelevel on both already
+    Torsion {
+        pdb: String,
+        mol2: String,
+        coords: String,
+        metadata: Metadata,
+        ndim: usize,
+        freeze_atoms: Vec<usize>,
+
+        /// number of snapshots
+        ns: usize,
+
+        /// how much data to write to disk
+        writelevel: usize,
+
+        /// harmonic restraint for non-torsion atoms in kcal/mol
+        restrain_k: f64,
+
+        /// attenuate the weights as a function of energy
+        attenuate: bool,
+
+        /// energy denominator for objective function
+        energy_denom: f64,
+
+        /// upper cutoff energy
+        energy_upper: f64,
+        // TODO might need to read_reference_data, construct engine_args, and
+        // engine.
+    },
+    OptGeo,
+}
+
+pub(crate) struct Target {
+    // options from Target base class
+    /// root directory of the whole project. probably redundant with the same
+    /// value on FF
+    root: PathBuf,
+
+    /// name of the target
+    name: String,
+
+    /// type of target
+    typ: TargetType,
+
+    /// relative weight of the target
+    weight: f64,
+
+    /// switch for finite difference gradients
+    fdgrad: bool,
+
+    /// switch for finite difference hessians
+    fdhess: bool,
+
+    /// switch for finite difference gradients + hessian diagonals
+    fdhessdiag: bool,
+
+    /// how many seconds to sleep
+    sleepy: usize,
+
+    /// parameter types that trigger FD gradient elements. defaults to []. NOTE:
+    /// this is obviously not the right type, just picking something small as a
+    /// placeholder
+    fd1_pids: Vec<()>,
+
+    /// parameter types that trigger FD hessian elements. defaults to [].
+    fd2_pids: Vec<()>,
+
+    /// finite difference step size
     pub(crate) h: f64,
+
+    /// whether to make backup files
+    backup: bool,
+
+    /// directory to read data from
+    rd: PathBuf,
+
+    /// iteration where we turn on zero-gradient skipping
+    zerograd: isize,
+
+    /// gradient norm below which we skip
+    epsgrad: f64,
+
+    /// "dictionary" of whether to call the derivatives
+    pgrad: Vec<bool>,
+
+    /// relative directory of the target
+    tgtdir: PathBuf,
+
+    /// temporary working directory. set to temp/target_name. used for storing
+    /// temporary variables that don't change through the course of the
+    /// optimization
+    tempbase: PathBuf,
+
+    tempdir: PathBuf,
+
+    /// the directory in which the simulation is running - this can be updated
+    rundir: PathBuf,
+
+    /// need the forcefield (here for now). NOTE: this seems insane. I'm going
+    /// to use so much memory if I clone forcefields onto every target
+    ff: FF,
+
+    /// counts how often the objective function was computed
+    xct: usize,
+
+    /// Counts how often the gradient was computed
+    gct: usize,
+
+    /// Counts how often the Hessian was computed
+    hct: usize,
+
+    /// Whether to read indicate.log from file when restarting an aborted run.
+    read_indicate: bool,
+
+    /// Whether to write indicate.log at every iteration (true for all but remote.)
+    write_indicate: bool,
+
+    /// Whether to read objective.p from file when restarting an aborted run.
+    read_objective: bool,
+
+    /// Whether to write objective.p at every iteration (true for all but remote.)
+    write_objective: bool,
 
     /// bsave in Python but I think the b means bool..
     save: bool,
 
-    name: String,
-
-    weight: f64,
-
+    /// whether the target has been evaluated yet
     evaluated: bool,
+
+    /// whether the previous optimization step was good
+    pub(crate) good_step: bool,
+
+    openmm_precision: String,
+    openmm_platform: String,
 }
 
 impl Target {
@@ -132,9 +270,113 @@ impl Objective {
             p: config.penalty_power,
             ptype,
         };
+        let mut targets = Vec::new();
+        for target in &config.targets {
+            let tgtdir = PathBuf::from("targets");
+            if !tgtdir.is_dir() {
+                panic!(
+                    "The targets directory is missing! \
+                     Did you finish setting up the target data?"
+                );
+            }
+            let tgtdir = tgtdir.join(&target.name);
+            let tempbase = PathBuf::from("temp");
+            let tempdir = tempbase.join(&target.name);
+            let rundir = tempdir.clone();
+            if !config.cont {
+                // delete the temporary directory and create a new one. TODO
+                // "back up if desired"
+                let abstempdir = forcefield.root.join(tempdir);
+                if abstempdir.is_dir() {
+                    std::fs::remove_dir_all(&abstempdir).unwrap_or_else(|e| {
+                        debug!("failed to remove {abstempdir:?} with {e}")
+                    });
+                }
+                std::fs::create_dir_all(&abstempdir).unwrap_or_else(|e| {
+                    debug!("failed to create {abstempdir:?} with {e}")
+                });
+            }
+            let typ = match target.typ {
+                config::TargetType::Torsion => {
+                    let meta_file = tgtdir.join("metadata.json");
+                    let metadata: Metadata = serde_json::from_str(
+                        &std::fs::read_to_string(meta_file)
+                            .expect("TorsionProfileTarget needs metadata.json"),
+                    )
+                    .unwrap();
+                    let ndim = metadata.dihedrals.len();
+                    let freeze_atoms =
+                        metadata.dihedrals.iter().cloned().flatten().collect();
+                    let mol: Vec<()> = todo!("some kind of Molecule field");
+                    let ns = mol.len();
+                    TargetType::Torsion {
+                        pdb: target
+                            .pdb
+                            .clone()
+                            .unwrap_or_else(|| String::from("conf.pdf")),
+                        mol2: target.mol2.clone().unwrap(),
+                        coords: target
+                            .coords
+                            .clone()
+                            .unwrap_or_else(|| String::from("scan.xyz")),
+                        metadata,
+                        ndim,
+                        freeze_atoms,
+                        ns,
+                        writelevel: target.writelevel,
+                        restrain_k: target.restrain_k,
+                        attenuate: target.attenuate,
+                        energy_denom: target.energy_denom,
+                        energy_upper: target.energy_upper,
+                    }
+                }
+                config::TargetType::OptGeo => TargetType::OptGeo,
+            };
+            targets.push(Target {
+                good_step: false,
+                h: config.finite_difference_h,
+                save: todo!(),
+                name: target.name,
+                weight: target.weight,
+                evaluated: false,
+                openmm_precision: target
+                    .openmm_precision
+                    .clone()
+                    .unwrap_or_else(|| String::from("double")),
+                openmm_platform: target
+                    .openmm_platform
+                    .clone()
+                    .unwrap_or_else(|| String::from("Reference")),
+                typ,
+                root: forcefield.root.clone(),
+                fdgrad: target.fdgrad,
+                fdhess: target.fdhess,
+                fdhessdiag: target.fdhessdiag,
+                sleepy: target.sleepy,
+                fd1_pids: Vec::new(),
+                fd2_pids: Vec::new(),
+                backup: config.backup,
+                rd: PathBuf::from(target.read.clone().unwrap_or_default()),
+                zerograd: config.zerograd,
+                epsgrad: target.epsgrad,
+                pgrad: vec![true; forcefield.np],
+                tgtdir,
+                tempbase,
+                tempdir,
+                rundir,
+                ff: forcefield,
+                xct: 0,
+                gct: 0,
+                hct: 0,
+                read_indicate: true,
+                write_indicate: true,
+                read_objective: true,
+                write_objective: true,
+            })
+        }
         Self {
             forcefield,
-            targets: Vec::new(),
+            targets,
             obj_map: HashMap::new(),
             penalty,
             // TODO should be some of weights from targets

@@ -65,11 +65,11 @@ pub struct Config {
     /// Set to a nonnegative number to turn on zero gradient skipping at that
     /// optimization step.
     #[serde(default = "default_zerograd")]
-    zerograd: isize,
+    pub(crate) zerograd: isize,
 
     /// Write temp directories to backup before wiping them
     #[serde(default = "default_backup")]
-    backup: bool,
+    pub(crate) backup: bool,
 
     /// Write the checkpoint file at every optimization step
     #[serde(default = "default_writechk_step")]
@@ -142,7 +142,7 @@ pub struct Config {
     /// recovery).
     #[serde(rename = "continue")]
     #[serde(default)]
-    cont: bool,
+    pub(crate) cont: bool,
 
     /// Allow duplicate parameter names (only if you know what you are doing!
     #[serde(default)]
@@ -184,7 +184,7 @@ pub struct Config {
 
     /// Step size for finite difference derivatives in many functions
     #[serde(default = "default_finite_difference_h")]
-    finite_difference_h: f64,
+    pub(crate) finite_difference_h: f64,
 
     /// Make sure that the finite difference step size does not exceed this
     /// multiple of the trust radius.

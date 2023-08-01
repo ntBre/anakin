@@ -20,7 +20,7 @@ pub struct FF {
     // options from the config file
     // ============================
     /// the root directory of the project
-    root: PathBuf,
+    pub(crate) root: PathBuf,
 
     /// force field names
     fnms: Vec<String>,

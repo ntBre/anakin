@@ -13,6 +13,7 @@ toml = "0.7.6"
 openff-toolkit = { path = "../openff-toolkit" }
 env_logger = "0.10.0"
 log = "0.4.19"
+serde_json = "1.0.104"
 
 [dev-dependencies]
 approx = "0.5.1"
