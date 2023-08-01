@@ -6,6 +6,7 @@ use serde::Deserialize;
 use crate::{
     config::{self, Config},
     forcefield::FF,
+    molecule::Molecule,
     work_queue::WorkQueue,
     Dmat, Dvec,
 };
@@ -293,6 +294,7 @@ impl Objective {
                     debug!("failed to create {abstempdir:?} with {e}")
                 });
             }
+            let root = forcefield.root.clone();
             let typ = match target.typ {
                 config::TargetType::Torsion => {
                     let meta_file = tgtdir.join("metadata.json");
@@ -304,18 +306,23 @@ impl Objective {
                     let ndim = metadata.dihedrals.len();
                     let freeze_atoms =
                         metadata.dihedrals.iter().flatten().cloned().collect();
-                    let mol: Vec<()> = todo!("some kind of Molecule field");
+                    let pdb = target
+                        .pdb
+                        .clone()
+                        .unwrap_or_else(|| String::from("conf.pdb"));
+                    let coords = target
+                        .coords
+                        .clone()
+                        .unwrap_or_else(|| String::from("scan.xyz"));
+                    let mol = Molecule::new(
+                        root.join(&tgtdir).join(&coords),
+                        root.join(&tgtdir).join(&pdb),
+                    );
                     let ns = mol.len();
                     TargetType::Torsion {
-                        pdb: target
-                            .pdb
-                            .clone()
-                            .unwrap_or_else(|| String::from("conf.pdf")),
+                        pdb,
                         mol2: target.mol2.clone().unwrap(),
-                        coords: target
-                            .coords
-                            .clone()
-                            .unwrap_or_else(|| String::from("scan.xyz")),
+                        coords,
                         metadata,
                         ndim,
                         freeze_atoms,
@@ -344,7 +351,7 @@ impl Objective {
                     .clone()
                     .unwrap_or_else(|| String::from("Reference")),
                 typ,
-                root: forcefield.root.clone(),
+                root,
                 fdgrad: target.fdgrad,
                 fdhess: target.fdhess,
                 fdhessdiag: target.fdhessdiag,
