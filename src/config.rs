@@ -3,8 +3,10 @@ use std::{collections::HashMap, error::Error, fs::read_to_string, path::Path};
 use serde::Deserialize;
 
 mod default_fns;
+mod target;
 
 use default_fns::*;
+pub(crate) use target::*;
 
 /// generated partially by `scripts/convert_config.py`
 #[derive(Deserialize)]
@@ -237,6 +239,9 @@ pub struct Config {
     pub(crate) forcefield: Vec<String>,
 
     pub(crate) priors: Option<HashMap<String, HashMap<String, f64>>>,
+
+    #[serde(rename = "target")]
+    pub(crate) targets: Vec<Target>,
 }
 
 impl Config {
