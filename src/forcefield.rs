@@ -236,29 +236,7 @@ impl FF {
     }
 }
 
-fn mktransmat(
-    np: usize,
-    rs: &nalgebra::Matrix<
-        f64,
-        nalgebra::Dyn,
-        nalgebra::Const<1>,
-        nalgebra::VecStorage<f64, nalgebra::Dyn, nalgebra::Const<1>>,
-    >,
-) -> (
-    nalgebra::Matrix<
-        f64,
-        nalgebra::Dyn,
-        nalgebra::Dyn,
-        nalgebra::VecStorage<f64, nalgebra::Dyn, nalgebra::Dyn>,
-    >,
-    Vec<usize>,
-    nalgebra::Matrix<
-        f64,
-        nalgebra::Dyn,
-        nalgebra::Dyn,
-        nalgebra::VecStorage<f64, nalgebra::Dyn, nalgebra::Dyn>,
-    >,
-) {
+fn mktransmat(np: usize, rs: &Dvec) -> (Dmat, Vec<usize>, Dmat) {
     let mut qmap: Vec<usize> = Vec::new();
     let mut qid: Vec<Vec<usize>> = Vec::new();
     let mut qid2: Vec<Vec<usize>> = Vec::new();
