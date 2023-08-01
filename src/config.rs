@@ -20,7 +20,7 @@ pub struct Config {
 
     /// Type of the penalty: L2, L1 or Box
     #[serde(default = "default_penalty_type")]
-    penalty_type: String,
+    pub(crate) penalty_type: String,
 
     /// Values to scan in the parameter space, given like this: -0.1:0.1:11
     scan_vals: Option<String>,
@@ -110,7 +110,7 @@ pub struct Config {
 
     /// Normalize the weights for the fitting targets
     #[serde(default = "default_normalize_weights")]
-    normalize_weights: bool,
+    pub(crate) normalize_weights: bool,
 
     /// Set to false to suppress printing options that are equal to their
     /// defaults
@@ -197,25 +197,25 @@ pub struct Config {
     finite_difference_factor: f64,
 
     /// Factor for additive penalty function in objective function
-    penalty_additive: f64,
+    pub(crate) penalty_additive: f64,
 
     /// Factor for multiplicative penalty function in objective function
     #[serde(default)]
-    penalty_multiplicative: f64,
+    pub(crate) penalty_multiplicative: f64,
 
     /// Extra parameter for fusion penalty function. Dictates position of log
     /// barrier or L1-L0 switch distance
     #[serde(default = "default_penalty_alpha")]
-    penalty_alpha: f64,
+    pub(crate) penalty_alpha: f64,
 
     /// Cusp region for hyperbolic constraint; for x=0, the Hessian is a/2b
     #[serde(default = "default_penalty_hyperbolic_b")]
-    penalty_hyperbolic_b: f64,
+    pub(crate) penalty_hyperbolic_b: f64,
 
     /// Power of the Euclidean norm of the parameter vector (default 2.0 is
     /// normal L2 penalty)
     #[serde(default = "default_penalty_power")]
-    penalty_power: f64,
+    pub(crate) penalty_power: f64,
 
     /// The step size is increased / decreased by up to this much in the event
     /// of a good / bad step; increase for a more variable step size.

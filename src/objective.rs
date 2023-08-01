@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
-use crate::{forcefield::FF, work_queue::WorkQueue, Dmat, Dvec};
+use crate::{
+    config::Config, forcefield::FF, work_queue::WorkQueue, Dmat, Dvec,
+};
 
-use self::penalty::Penalty;
+use self::penalty::{Penalty, PenaltyType};
 
 pub(crate) mod penalty;
 
@@ -57,23 +59,6 @@ impl Regularization {
 
 pub(crate) struct Extra(f64, Dvec, Dmat);
 
-pub struct Objective {
-    forcefield: FF,
-    pub(crate) targets: Vec<Target>,
-
-    /// in Python this is an entry in the ObjDict map. TODO consider making
-    /// it an Option depending on how it's used
-    obj_map: HashMap<String, Regularization>,
-
-    pub(crate) penalty: Penalty,
-
-    // I might never use this
-    asynchronous: bool,
-
-    /// assuming this means total weight
-    wtot: f64,
-}
-
 #[derive(Clone)]
 pub(crate) struct ObjMap {
     pub(crate) x0: f64,
@@ -111,15 +96,54 @@ fn in_fd() -> bool {
     false
 }
 
+pub struct Objective {
+    pub(crate) penalty: Penalty,
+    normalize_weights: bool,
+    forcefield: FF,
+    pub(crate) targets: Vec<Target>,
+
+    /// in Python this is an entry in the ObjDict map. TODO consider making
+    /// it an Option depending on how it's used
+    obj_map: HashMap<String, Regularization>,
+
+    // I might never use this
+    asynchronous: bool,
+
+    /// assuming this means total weight
+    wtot: f64,
+}
+
 impl Objective {
-    pub fn new(forcefield: FF) -> Self {
+    pub fn new(config: &Config, forcefield: FF) -> Self {
+        let ptype = match config.penalty_type.to_lowercase().as_str() {
+            "hyp" | "hyper" | "l1" | "hyperbola" | "hyperbolic" => {
+                PenaltyType::Hyperbolic
+            }
+            "para" | "parabola" | "l2" | "quadratic" | "parabolic" => {
+                PenaltyType::Parabolic
+            }
+            "box" => PenaltyType::Box,
+            _ => {
+                panic!("unrecognized penalty_type: {}", config.penalty_type)
+            }
+        };
+        let penalty = Penalty {
+            fadd: config.penalty_additive,
+            fmul: config.penalty_multiplicative,
+            a: config.penalty_alpha,
+            b: config.penalty_hyperbolic_b,
+            p: config.penalty_power,
+            ptype,
+        };
         Self {
             forcefield,
             targets: Vec::new(),
             obj_map: HashMap::new(),
-            penalty: Penalty::default(), // TODO from config
+            penalty,
             asynchronous: false,
-            wtot: 1.0, // TODO should be some of weights from targets
+            // TODO should be some of weights from targets
+            wtot: 1.0,
+            normalize_weights: config.normalize_weights,
         }
     }
 

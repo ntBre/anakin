@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     debug!("finished initializing forcefield");
     // TODO probably this forcefield is supposed to be a reference and not
     // separate clones, but we'll see
-    let objective = Objective::new(forcefield.clone());
+    let objective = Objective::new(&config, forcefield.clone());
     debug!("finished initializing objective");
     let mut optimizer = Optimizer::new(objective, forcefield);
     debug!("finished initializing optimizer");

@@ -67,11 +67,11 @@ pub(crate) enum PenaltyType {
 
 #[derive(Default)]
 pub(crate) struct Penalty {
-    fadd: f64,
-    fmul: f64,
-    a: f64,
-    b: f64,
-    p: f64,
+    pub(crate) fadd: f64,
+    pub(crate) fmul: f64,
+    pub(crate) a: f64,
+    pub(crate) b: f64,
+    pub(crate) p: f64,
     pub(crate) ptype: PenaltyType,
     // spacings: HashMap?
 }
