@@ -52,9 +52,6 @@ pub struct Config {
     #[serde(default = "default_objective_history")]
     objective_history: isize,
 
-    /// The port number to use for Work Queue
-    wq_port: isize,
-
     /// The number of convergence criteria that must be met for main optimizer
     /// to converge
     #[serde(default = "default_criteria")]
