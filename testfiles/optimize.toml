@@ -82,11 +82,11 @@ coords = "scan.xyz"
 
 writelevel = 2
 
-attenuate = 1
+attenuate = true
 
 energy_denom = 1.0
 energy_upper = 8.0
-remote = 1
+remote = true
 
 
 [[target]]
@@ -96,4 +96,4 @@ weight = 0.01
 type = "OptGeoTarget_SMIRNOFF"
 
 writelevel = 1
-remote = 1
+remote = true

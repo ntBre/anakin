@@ -444,6 +444,112 @@ pub(crate) struct Target {
     /// Force constant for harmonic positional energy restraints
     #[serde(default = "default_restrain_k")]
     restrain_k: f64,
+
+    /// Finite difference gradient of objective function w/r.t. specified
+    /// parameters
+    #[serde(default)]
+    fdgrad: bool,
+
+    /// Finite difference Hessian of objective function w/r.t. specified
+    /// parameters
+    #[serde(default)]
+    fdhess: bool,
+
+    /// Finite difference Hessian diagonals w/r.t. specified parameters (costs
+    /// 2np times a objective calculation)
+    #[serde(default)]
+    fdhessdiag: bool,
+
+    /// Compute all energies and forces in one fell swoop where possible(as
+    /// opposed to calling the simulation code once per snapshot)
+    #[serde(default = "default_all_at_once")]
+    all_at_once: bool,
+
+    /// For OpenMM or other codes with Python interface: Compute energies and
+    /// forces internally
+    #[serde(default = "default_run_internal")]
+    run_internal: bool,
+
+    /// Enable the energy objective function
+    #[serde(default = "default_energy")]
+    energy: bool,
+
+    /// Enable the force objective function
+    #[serde(default = "default_force")]
+    force: bool,
+
+    /// Enable the RESP objective function
+    #[serde(default)]
+    resp: bool,
+
+    /// Call Q-Chem to do MM COSMO on MM snapshots.
+    #[serde(default)]
+    do_cosmo: bool,
+
+    /// Perform a geometry optimization before computing properties
+    #[serde(default = "default_optimize_geometry")]
+    optimize_geometry: bool,
+
+    /// Normalize interaction energies using 1/sqrt(denom**2 + (E(qm)-denom)**2)
+    /// for energies more positive than denom.
+    #[serde(default)]
+    attenuate: bool,
+
+    /// Divide objective function by the number of snapshots / vibrations
+    #[serde(default)]
+    normalize: bool,
+
+    /// Normalize the condensed phase property contributions to the liquid /
+    /// lipid property target
+    #[serde(default)]
+    w_normalize: bool,
+
+    /// Give the user a chance to fill in condensed phase stuff on the zeroth
+    /// step
+    #[serde(default)]
+    manual: bool,
+
+    /// Don't target the average enthalpy of vaporization and allow it to freely
+    /// float (experimental)
+    #[serde(default)]
+    hvap_subaverage: bool,
+
+    /// Force the external npt.py script to crash if CUDA Platform not available
+    #[serde(default)]
+    force_cuda: bool,
+
+    /// Enable anisotropic box scaling (e.g. for crystals or two-phase
+    /// simulations) in external npt.py script
+    #[serde(default)]
+    anisotropic_box: bool,
+
+    /// Enable multiple-timestep integrator in external npt.py script
+    #[serde(default)]
+    mts_integrator: bool,
+
+    /// Minimize the energy of the system prior to running dynamics
+    #[serde(default = "default_minimize_energy")]
+    minimize_energy: bool,
+
+    /// Evaluate target as a remote work_queue task
+    #[serde(default)]
+    remote: bool,
+
+    /// Adapt to simulation uncertainty by combining property estimations and
+    /// adjusting simulation length.
+    #[serde(default)]
+    adapt_errors: bool,
+
+    /// When running remote target, back up files at the remote location.
+    #[serde(default)]
+    remote_backup: bool,
+
+    /// Pure numerical gradients -- launch two additional simulations for each
+    /// perturbed forcefield parameter, and compute derivatives using 3-point
+    /// formula. (This is very expensive and should only serve as a sanity
+    /// check)
+    #[serde(default)]
+    pure_num_grad: bool,
 }
 fn default_weight() -> f64 {
     1.0
@@ -723,4 +829,28 @@ fn default_n_sim_chain() -> usize {
 
 fn default_hess_normalize_type() -> usize {
     0
+}
+
+fn default_all_at_once() -> bool {
+    true
+}
+
+fn default_run_internal() -> bool {
+    true
+}
+
+fn default_energy() -> bool {
+    true
+}
+
+fn default_force() -> bool {
+    true
+}
+
+fn default_optimize_geometry() -> bool {
+    true
+}
+
+fn default_minimize_energy() -> bool {
+    true
 }
