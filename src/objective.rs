@@ -149,9 +149,6 @@ pub(crate) struct Target {
     /// Whether to write objective.p at every iteration (true for all but remote.)
     write_objective: bool,
 
-    /// bsave in Python but I think the b means bool..
-    save: bool,
-
     /// whether the target has been evaluated yet
     evaluated: bool,
 
@@ -335,7 +332,6 @@ impl Objective {
             targets.push(Target {
                 good_step: false,
                 h: config.finite_difference_h,
-                save: todo!(),
                 name: target.name,
                 weight: target.weight,
                 evaluated: false,
@@ -424,7 +420,6 @@ impl Objective {
         // situation.
         let wq = WorkQueue::new();
         for tgt in self.targets.iter_mut() {
-            tgt.save = true;
             let ans: Extra = match order {
                 0 => tgt.get_x(&mvals),
                 1 => tgt.get_g(&mvals),
