@@ -7,7 +7,7 @@ use log::debug;
 
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
-    let config = match Config::load("testfiles/optimize.in") {
+    let config = match Config::load("testfiles/optimize.toml") {
         Ok(c) => c,
         Err(e) => {
             panic!("{e:#?}");

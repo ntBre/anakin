@@ -254,3 +254,14 @@ impl Config {
         Ok(config)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn load_config() {
+        let got = Config::load("testfiles/optimize.toml").unwrap();
+        assert_eq!(got.targets.len(), 1);
+    }
+}
