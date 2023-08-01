@@ -459,12 +459,17 @@ impl Optimizer {
             // either of these conditions could cause a convergence failure:
             // the maximum number of cycles is reached
             if self.iteration == self.maxstep {
+                debug!("breaking for too many iterations ({})", self.iteration);
                 break;
             }
 
             // the step size is too small to continue. sometimes happens for
             // very rough objective functions
             if self.iteration > self.iter_init && ndx < self.step_lowerbound {
+                debug!(
+                    "breaking for small step size: {ndx} < {}",
+                    self.step_lowerbound
+                );
                 break;
             }
 
@@ -481,7 +486,7 @@ impl Optimizer {
 
             // TODO write checkpoint
 
-            debug!("end of loop");
+            debug!("end of loop {}", self.iteration - 1);
         }
 
         debug!("assessing convergence");
