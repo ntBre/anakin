@@ -283,7 +283,7 @@ impl Objective {
             if !config.cont {
                 // delete the temporary directory and create a new one. TODO
                 // "back up if desired"
-                let abstempdir = forcefield.root.join(tempdir);
+                let abstempdir = forcefield.root.join(&tempdir);
                 if abstempdir.is_dir() {
                     std::fs::remove_dir_all(&abstempdir).unwrap_or_else(|e| {
                         debug!("failed to remove {abstempdir:?} with {e}")
@@ -303,7 +303,7 @@ impl Objective {
                     .unwrap();
                     let ndim = metadata.dihedrals.len();
                     let freeze_atoms =
-                        metadata.dihedrals.iter().cloned().flatten().collect();
+                        metadata.dihedrals.iter().flatten().cloned().collect();
                     let mol: Vec<()> = todo!("some kind of Molecule field");
                     let ns = mol.len();
                     TargetType::Torsion {
@@ -332,7 +332,7 @@ impl Objective {
             targets.push(Target {
                 good_step: false,
                 h: config.finite_difference_h,
-                name: target.name,
+                name: target.name.clone(),
                 weight: target.weight,
                 evaluated: false,
                 openmm_precision: target
@@ -360,7 +360,7 @@ impl Objective {
                 tempbase,
                 tempdir,
                 rundir,
-                ff: forcefield,
+                ff: forcefield.clone(),
                 xct: 0,
                 gct: 0,
                 hct: 0,
