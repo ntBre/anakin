@@ -87,3 +87,13 @@ attenuate = 1
 energy_denom = 1.0
 energy_upper = 8.0
 remote = 1
+
+
+[[target]]
+name = "opt-geo-batch-0"
+weight = 0.01
+
+type = "OptGeoTarget_SMIRNOFF"
+
+writelevel = 1
+remote = 1
