@@ -19,6 +19,7 @@ mod pdb;
 
 /// Molecule.Data gets copied into from the read_pdb return value (Answer), so
 /// our Molecule has the same fields as Answer
+#[derive(Debug, PartialEq)]
 pub(crate) struct Molecule {
     /// an N x 3 matrix containing the x, y, z coordinates for the atoms in the
     /// molecule
@@ -41,10 +42,11 @@ pub(crate) struct Molecule {
 
     /// vector of bond connections
     bonds: Vec<(usize, usize)>,
+    // TODO augment with fields from read_xyz
 }
 
 impl Molecule {
-    /// load a [Molecule] from `topology` and frames from `filename`. We only
+    /// load a [Molecule] from `filename` and frames from `topology`. We only
     /// know how to load frames from an xyz and the topology from a pdb
     pub(crate) fn new<P, Q>(
         filename: P,
@@ -88,9 +90,10 @@ impl Molecule {
                     rows += 1;
                 }
                 Record::Conect { atoms } => {
-                    let a = atoms[0];
+                    let a = atoms[0] - 1;
                     for b in &atoms[1..] {
-                        bonds.push((a.min(*b), a.max(*b)));
+                        let b = b - 1;
+                        bonds.push((a.min(b), a.max(b)));
                     }
                 }
                 _ => {
@@ -113,5 +116,95 @@ impl Molecule {
     pub(crate) fn len(&self) -> usize {
         // the fields should be parallel arrays, so just pick an easy one
         self.elem.len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use approx::assert_abs_diff_eq;
+    use nalgebra::dmatrix;
+
+    use super::*;
+
+    macro_rules! string {
+        ($($s:expr$(,)*)*) => {
+            vec![$($s.to_owned(),)*]
+        }
+    }
+
+    #[test]
+    fn load_molecule() {
+        let got =
+            Molecule::new("testfiles/test.xyz", "testfiles/test.pdb").unwrap();
+        let want = Molecule {
+            xyzs: dmatrix! [
+                1.699,  0.017, -3.523;
+                1.282,  0.133, -2.067;
+                2.183, -0.676, -1.294;
+                2.019, -0.731,  0.054;
+                2.952, -1.526,  0.748;
+                2.875, -1.651,  2.129;
+                1.859, -0.979,  2.825;
+                0.935, -0.181,  2.15;
+                1.009, -0.056,  0.761;
+                1.73 , -1.167,  4.598;
+                1.047,  0.006,  5.128;
+                3.017, -1.64 ,  5.116;
+                0.701, -2.526,  4.818;
+                -0.481, -2.457,  4.021;
+                1.034,  0.621, -4.148;
+                2.724,  0.373, -3.661;
+                1.643, -1.022, -3.859;
+                0.254, -0.224, -1.923;
+                1.34 ,  1.174, -1.723;
+                3.734, -2.023,  0.181;
+                3.605, -2.241,  2.674;
+                0.166,  0.339,  2.712;
+                0.288,  0.569,  0.249;
+                1.284, -3.352,  4.644;
+                -1.128, -3.149,  4.395;
+                -0.277, -2.728,  3.055;
+            ],
+            // NOTE: I'm not sure this and resname are strictly correct. they
+            // disagree with what ForceBalance outputs, but they seem right from
+            // my reading of the PDB spec. I don't think it really matters
+            // anyway because these fields shouldn't really be used (I assume)
+            altloc: string![
+                "UNK", "UNK", "UNK", "UNK", "UNK", "UNK", "UNK", "UNK", "UNK",
+                "UNK", "UNK", "UNK", "UNK", "UNK", "UNK", "UNK", "UNK", "UNK",
+                "UNK", "UNK", "UNK", "UNK", "UNK", "UNK", "UNK", "UNK"
+            ],
+            atomname: string![
+                "C1", "C2", "O3", "C4", "C5", "C6", "C7", "C8", "C9", "S10",
+                "O11", "O12", "N13", "N14", "H15", "H16", "H17", "H18", "H19",
+                "H20", "H21", "H22", "H23", "H24", "H25", "H26",
+            ],
+            resid: vec![
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0,
+            ],
+            resname: string![
+                "A", "A", "A", "A", "A", "A", "A", "A", "A", "A", "A", "A",
+                "A", "A", "A", "A", "A", "A", "A", "A", "A", "A", "A", "A",
+                "A", "A"
+            ],
+            elem: string![
+                "C", "C", "O", "C", "C", "C", "C", "C", "C", "S", "O", "O",
+                "N", "N", "H", "H", "H", "H", "H", "H", "H", "H", "H", "H",
+                "H", "H",
+            ],
+            #[rustfmt::skip]
+            bonds: vec![
+                (0, 1), (0, 14), (0, 15), (0, 16), (0, 1), (1, 2), (1, 17),
+                (1, 18), (1, 2), (2, 3), (2, 3), (3, 4), (3, 8), (3, 4), (4, 5),
+                (4, 19), (4, 5), (5, 6), (5, 20), (5, 6), (6, 7), (6, 9), (6, 7),
+                (7, 8), (7, 21), (3, 8), (7, 8), (8, 22), (6, 9), (9, 10),
+                (9, 11), (9, 12), (9, 10), (9, 11), (9, 12), (12, 13), (12, 23),
+                (12, 13), (13, 24), (13, 25), (0, 14), (0, 15), (0, 16), (1, 17),
+                (1, 18), (4, 19), (5, 20), (7, 21), (8, 22), (12, 23), (13, 24),
+                (13, 25),
+            ],
+        };
+        assert_eq!(got, want);
     }
 }
