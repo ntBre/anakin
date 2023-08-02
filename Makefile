@@ -5,4 +5,4 @@ clippy:
 	cargo clippy
 
 test:
-	cargo test
+	cargo test $(ARGS)
