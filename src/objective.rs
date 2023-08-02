@@ -317,7 +317,8 @@ impl Objective {
                     let mol = Molecule::new(
                         root.join(&tgtdir).join(&coords),
                         root.join(&tgtdir).join(&pdb),
-                    );
+                    )
+                    .unwrap();
                     let ns = mol.len();
                     TargetType::Torsion {
                         pdb,
