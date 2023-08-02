@@ -25,18 +25,6 @@ pub(crate) struct Molecule {
     /// molecule
     xyzs: Dmat,
 
-    /// vector of alternate locations
-    altloc: Vec<String>,
-
-    /// vector of atom names (element + number)
-    atomname: Vec<String>,
-
-    /// vector of atom residue ids
-    resid: Vec<usize>,
-
-    /// vector of atom residue names (seems to be UNK always for us)
-    resname: Vec<String>,
-
     /// vector of atomic symbols
     elem: Vec<String>,
 
@@ -104,10 +92,6 @@ impl Molecule {
 
         Ok(Self {
             xyzs: Dmat::from_row_slice(rows, 3, &xyzs),
-            altloc,
-            atomname,
-            resid,
-            resname,
             elem,
             bonds,
         })
@@ -165,29 +149,6 @@ mod tests {
                 -1.128, -3.149,  4.395;
                 -0.277, -2.728,  3.055;
             ],
-            // NOTE: I'm not sure this and resname are strictly correct. they
-            // disagree with what ForceBalance outputs, but they seem right from
-            // my reading of the PDB spec. I don't think it really matters
-            // anyway because these fields shouldn't really be used (I assume)
-            altloc: string![
-                "UNK", "UNK", "UNK", "UNK", "UNK", "UNK", "UNK", "UNK", "UNK",
-                "UNK", "UNK", "UNK", "UNK", "UNK", "UNK", "UNK", "UNK", "UNK",
-                "UNK", "UNK", "UNK", "UNK", "UNK", "UNK", "UNK", "UNK"
-            ],
-            atomname: string![
-                "C1", "C2", "O3", "C4", "C5", "C6", "C7", "C8", "C9", "S10",
-                "O11", "O12", "N13", "N14", "H15", "H16", "H17", "H18", "H19",
-                "H20", "H21", "H22", "H23", "H24", "H25", "H26",
-            ],
-            resid: vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0,
-            ],
-            resname: string![
-                "A", "A", "A", "A", "A", "A", "A", "A", "A", "A", "A", "A",
-                "A", "A", "A", "A", "A", "A", "A", "A", "A", "A", "A", "A",
-                "A", "A"
-            ],
             elem: string![
                 "C", "C", "O", "C", "C", "C", "C", "C", "C", "S", "O", "O",
                 "N", "N", "H", "H", "H", "H", "H", "H", "H", "H", "H", "H",
@@ -195,14 +156,10 @@ mod tests {
             ],
             #[rustfmt::skip]
             bonds: vec![
-                (0, 1), (0, 14), (0, 15), (0, 16), (0, 1), (1, 2), (1, 17),
-                (1, 18), (1, 2), (2, 3), (2, 3), (3, 4), (3, 8), (3, 4), (4, 5),
-                (4, 19), (4, 5), (5, 6), (5, 20), (5, 6), (6, 7), (6, 9), (6, 7),
-                (7, 8), (7, 21), (3, 8), (7, 8), (8, 22), (6, 9), (9, 10),
-                (9, 11), (9, 12), (9, 10), (9, 11), (9, 12), (12, 13), (12, 23),
-                (12, 13), (13, 24), (13, 25), (0, 14), (0, 15), (0, 16), (1, 17),
-                (1, 18), (4, 19), (5, 20), (7, 21), (8, 22), (12, 23), (13, 24),
-                (13, 25),
+                (0, 1), (0, 14), (0, 15), (0, 16), (1, 2), (1, 17), (1, 18),
+                (2, 3), (3, 4), (3, 8), (4, 5), (4, 19), (5, 6), (5, 20),
+                (6, 7), (6, 9), (7, 8), (7, 21), (8, 22), (9, 10), (9, 11),
+                (9, 12), (12, 13), (12, 23), (13, 24), (13, 25),
             ],
         };
         assert_eq!(got, want);
