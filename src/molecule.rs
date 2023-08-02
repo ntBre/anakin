@@ -6,31 +6,22 @@ use self::pdb::Record;
 
 mod pdb;
 
-// NOTE: skipped chain_id
-//
-// NOTE: skipping icode because I skipped it in the PDB parser too
-//
-// NOTE: also skipping `comms`, why would I need the comments lol
-//
-// NOTE: skipping `terminal` which appears to be a boolean vector saying whether
-// or not an atom is the terminal one... I'm operating under the assumption that
-// there is one molecule per PDB file right now, so in addition to being a
-// terrible representation, it's also unnecessary for me.
+// TODO surely I need the xyzs from the .xyz file too. I expect we'll be reading
+// these files over and over in the future
 
 /// Molecule.Data gets copied into from the read_pdb return value (Answer), so
 /// our Molecule has the same fields as Answer
 #[derive(Debug, PartialEq)]
 pub(crate) struct Molecule {
     /// an N x 3 matrix containing the x, y, z coordinates for the atoms in the
-    /// molecule
+    /// molecule. comes from read_pdb, overwriting earlier values from read_xyz
     xyzs: Dmat,
 
-    /// vector of atomic symbols
+    /// vector of atomic symbols. TODO supposed to come from read_xyz
     elem: Vec<String>,
 
-    /// vector of bond connections
+    /// vector of bond connections. TODO comes from build_topology
     bonds: Vec<(usize, usize)>,
-    // TODO augment with fields from read_xyz
 }
 
 impl Molecule {
@@ -49,46 +40,16 @@ impl Molecule {
         let pdb = Pdb::load(fnm)?;
 
         let mut xyzs = Vec::new();
-        let mut altloc = Vec::new();
-        let mut atomname = Vec::new();
-        let mut resid = Vec::new();
-        let mut resname = Vec::new();
-        let mut elem = Vec::new();
-        let mut bonds = Vec::new();
         let mut rows = 0;
         for r in pdb.records {
-            match r {
-                Record::Atom {
-                    name,
-                    alt_loc,
-                    res_name,
-                    res_seq,
-                    x,
-                    y,
-                    z,
-                    element,
-                    ..
-                } => {
-                    altloc.push(alt_loc);
-                    atomname.push(name);
-                    resid.push(res_seq);
-                    resname.push(res_name);
-                    elem.push(element);
-                    xyzs.extend([x, y, z]);
-                    rows += 1;
-                }
-                Record::Conect { atoms } => {
-                    let a = atoms[0] - 1;
-                    for b in &atoms[1..] {
-                        let b = b - 1;
-                        bonds.push((a.min(b), a.max(b)));
-                    }
-                }
-                _ => {
-                    continue;
-                }
+            if let Record::Atom { x, y, z, .. } = r {
+                xyzs.extend([x, y, z]);
+                rows += 1;
             };
         }
+
+        let mut elem = Vec::new();
+        let mut bonds = Vec::new();
 
         Ok(Self {
             xyzs: Dmat::from_row_slice(rows, 3, &xyzs),
@@ -105,7 +66,6 @@ impl Molecule {
 
 #[cfg(test)]
 mod tests {
-    use approx::assert_abs_diff_eq;
     use nalgebra::dmatrix;
 
     use super::*;
