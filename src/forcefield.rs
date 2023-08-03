@@ -288,7 +288,7 @@ impl FF {
 
         let fnm = self.fnms.first().unwrap();
         let path = dir.as_ref().join(fnm);
-        std::fs::write(dbg!(path), newffdata.to_xml().unwrap()).unwrap();
+        std::fs::write(path, newffdata.to_xml().unwrap()).unwrap();
 
         pvals
     }
