@@ -145,7 +145,88 @@ impl Molecule {
         let gszx = gsz;
         let gszy = gsz;
         let gszz = gsz;
+
+        // this looks so stupid, but I'm doing it for now. this is just a big
+        // list of pairs
+        let na = self.elem.len();
+        let mut atom_iterator = Vec::new();
+        for i in 0..na {
+            for j in i + 1..na {
+                atom_iterator.push((i, j));
+            }
+        }
+
+        // taken from self.top_settings["Fac"] but is this a default?
+        let fac = 1.2;
+
+        // oh look now we're splitting up the pairs.......
+        let bt0: Vec<_> = atom_iterator.iter().map(|(a, _)| r[*a]).collect();
+        let bt1: Vec<_> = atom_iterator.iter().map(|(_, a)| r[*a]).collect();
+
+        // holy moly what is going on here
+        let mut bond_thresh = Vec::new();
+        for (bt0, bt1) in bt0.iter().zip(&bt1) {
+            let bt = (bt0 + bt1) * fac;
+            // just hilarious
+            let bt = (bt > mindist) as usize as f64 * bt
+                + (bt < mindist) as usize as f64 * mindist;
+            // TODO
+            // these conditions evaluate to 1 if true, so if bt > mindist { bt }
+            // else if bt < mindist { mindist }. aka max(bt, mindist) ???????
+            bond_thresh.push(bt);
+        }
+
+        // if not toppbc
+        let dxij = atom_contact(&self.xyzs, &atom_iterator);
+
+        // create a list of atoms that each atom is bonded to
+        let mut atom_bonds = vec![vec![]; na];
+        for (i, d) in dxij.iter().enumerate() {
+            if d < &bond_thresh[i] {
+                let (ii, jj) = atom_iterator[i];
+                if ii == jj {
+                    // omfg we didn't even filter out the same atom pairs
+                    // before... we've done all this work just to filter them
+                    // here lmao
+                    continue;
+                }
+                // oh boy I can't wait to see what we do with this... it's
+                // looking a whole lot like what we already had in
+                // atom_iterator!!
+                atom_bonds[ii].push(jj);
+                atom_bonds[jj].push(ii);
+            }
+        }
+
+        let mut bond_list = Vec::new();
+        for (i, bi) in atom_bonds.iter().enumerate() {
+            for &j in bi {
+                if i == j {
+                    continue;
+                }
+                // TODO fragment/resid check
+                if i < j {
+                    bond_list.push((i, j));
+                } else {
+                    bond_list.push((j, i));
+                }
+            }
+        }
+
+        bond_list.sort();
+        // holy moly whyyy
+        bond_list.dedup();
+        self.bonds = bond_list;
     }
+}
+
+/// compute the distances between the atoms in `xyzs` requested in `pairs`
+fn atom_contact(xyzs: &Dmat, pairs: &[(usize, usize)]) -> Vec<f64> {
+    let mut ret = Vec::with_capacity(pairs.len());
+    for (a, b) in pairs {
+        ret.push((xyzs.row(*a) - xyzs.row(*b)).norm());
+    }
+    ret
 }
 
 #[cfg(test)]
