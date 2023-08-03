@@ -116,35 +116,8 @@ impl Molecule {
             })
         }
 
-        // TODO this is taken from self.top_settings["topframe"]
-        let sn = 0;
-
         // minimum distance for considering two atoms bonded
         let mindist = 1.0;
-
-        // TODO I'm only holding xyzs[sn] currently. index with sn if I ever
-        // hold the whole thing
-        let mins = np_min(&self.xyzs);
-        let maxs = np_max(&self.xyzs);
-
-        // grid size in angstrom. lpw says this is optimized for speed on a
-        // 15,000 atom system
-        let gsz = 6.0;
-
-        // this is supposed to be gated behind "if not hasattr(self, 'boxes')",
-        // but we don't has any attrs
-        let [xmin, ymin, zmin] = mins;
-        let [xmax, ymax, zmax] = maxs;
-        let toppbc = false;
-
-        let xext = xmax - xmin;
-        let yext = ymax - ymin;
-        let zext = zmax - zmin;
-
-        // again, "if not toppbc"
-        let gszx = gsz;
-        let gszy = gsz;
-        let gszz = gsz;
 
         // this looks so stupid, but I'm doing it for now. this is just a big
         // list of pairs
