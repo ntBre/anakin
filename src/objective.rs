@@ -247,40 +247,36 @@ impl Target {
                 // this is inside compute, but we need ns from here. also not
                 // sure why he makes it a function only to call it immediately
                 // lmao
-                let compute = |mvals| {
-                    self.torsion_compute(mvals);
-                    let mut emms = Vec::new();
-                    let mut rmsds = Vec::new();
-                    // we only support OpenMM as an engine for now
-                    let engine = OpenMM::new();
-                    for i in 0..*ns {
-                        let (energy, rmsd, m_opt) = engine.optimize(i, false);
-                        emms.push(energy);
-                        rmsds.push(rmsd);
-                    }
+                self.torsion_compute(mvals);
+                let mut emms = Vec::new();
+                let mut rmsds = Vec::new();
+                // we only support OpenMM as an engine for now
+                let engine = OpenMM::new();
+                for i in 0..*ns {
+                    let (energy, rmsd, m_opt) = engine.optimize(i, false);
+                    emms.push(energy);
+                    rmsds.push(rmsd);
+                }
 
-                    let emin =
-                        *emms.iter().min_by(|a, b| a.total_cmp(b)).unwrap();
-                    for e in emms.iter_mut() {
-                        *e -= emin;
-                    }
-                    let emms = Dvec::from(emms);
-                    let mut w = wts.clone();
-                    for w in w.iter_mut() {
-                        *w = w.sqrt();
-                    }
-                    let w = w / *energy_denom;
-                    let z = (emms - eqm);
+                let emin = *emms.iter().min_by(|a, b| a.total_cmp(b)).unwrap();
+                for e in emms.iter_mut() {
+                    *e -= emin;
+                }
+                let emms = Dvec::from(emms);
+                let mut w = wts.clone();
+                for w in w.iter_mut() {
+                    *w = w.sqrt();
+                }
+                let w = w / *energy_denom;
+                let z = (emms - eqm);
 
-                    // TODO better way here, just lazy for now
-                    let mut ret = Vec::new();
-                    for (w, z) in w.iter().zip(z.iter()) {
-                        ret.push(w * z)
-                    }
-                    Dvec::from(ret)
-                };
+                // TODO better way here, just lazy for now
+                let mut ret = Vec::new();
+                for (w, z) in w.iter().zip(z.iter()) {
+                    ret.push(w * z)
+                }
+                let v = Dvec::from(ret);
 
-                let v = compute(mvals);
                 answer.0 = v.dot(&v);
 
                 let e_rmse = wts.dot((emms - eqm).powi(2));
