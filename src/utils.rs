@@ -48,6 +48,41 @@ pub(crate) fn orthogonalize(v1: Dvec, v2: Dvec) -> Dvec {
     &v1 - &v2u * (v1.dot(&v2u))
 }
 
+/// compute the elementwise minimum of `xyzs`. I.e. it returns the minimum, x,
+/// y, and z across the whole matrix, not the "minimum row," whatever that would
+/// mean. panics if `xyzs` does not have 3 columns
+pub(crate) fn np_min(xyzs: &Dmat) -> [f64; 3] {
+    np_cmp(xyzs, f64::lt)
+}
+
+/// compute the elementwise maximum of `xyzs`. I.e. it returns the maximum, x,
+/// y, and z across the whole matrix, not the "maximum row," whatever that would
+/// mean. panics if `xyzs` does not have 3 columns
+pub(crate) fn np_max(xyzs: &Dmat) -> [f64; 3] {
+    np_cmp(xyzs, f64::gt)
+}
+
+/// in theory this could be a much more general function to match numpy's, but
+/// so far i'm only using it in the 3 case, and it would be nice to destructure
+/// the result. it could make more sense just to return a 1-row Dmat with the
+/// same number of columns as the input, though.
+pub(crate) fn np_cmp(
+    xyzs: &Dmat,
+    cmp_fn: impl Fn(&f64, &f64) -> bool,
+) -> [f64; 3] {
+    let (_, c) = xyzs.shape();
+    assert_eq!(c, 3);
+    let mut ret = xyzs.row(0).into_owned();
+    for row in xyzs.row_iter().skip(1) {
+        for i in 0..3 {
+            if cmp_fn(&row[i], &ret[i]) {
+                ret[i] = row[i];
+            }
+        }
+    }
+    [ret[0], ret[1], ret[2]]
+}
+
 #[cfg(test)]
 mod tests {
     use approx::assert_abs_diff_eq;
