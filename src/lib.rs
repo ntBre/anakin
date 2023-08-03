@@ -9,6 +9,7 @@ type Dmat = nalgebra::DMatrix<f64>;
 pub mod config;
 pub mod forcefield;
 mod molecule;
+mod engine;
 pub mod objective;
 pub mod optimizer;
 mod utils;
