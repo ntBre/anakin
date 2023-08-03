@@ -1,10 +1,17 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{BufRead, BufReader},
+    path::{Path, PathBuf},
+};
 
 use log::{debug, error};
 use serde::Deserialize;
+use tempfile::{tempdir, TempDir};
 
 use crate::{
     config::{self, Config},
+    engine::OpenMM,
     forcefield::FF,
     molecule::Molecule,
     work_queue::WorkQueue,
@@ -55,6 +62,9 @@ enum TargetType {
         energy_upper: f64,
         // TODO might need to read_reference_data, construct engine_args, and
         // engine.
+        wts: Dvec,
+
+        eqm: Dvec,
     },
     OptGeo,
 }
@@ -158,11 +168,21 @@ pub(crate) struct Target {
 
     openmm_precision: String,
     openmm_platform: String,
+
+    /// initially None, Some after calling [Self::stage]
+    staged_tempdir: Option<TempDir>,
 }
 
 impl Target {
-    fn stage(&self, mvals: Dvec, order_1: bool, order_2: bool) {
-        todo!()
+    /// stage the directory for the target and then launch work queue processes
+    /// if any
+    fn stage(&mut self, mvals: Dvec, order_1: bool, order_2: bool) {
+        // instead of all the work making a directory in the Python version,
+        // just grab a tempdir automagically. it should be deleted automaticaly
+        // when we set staged_tempdir back to None too.
+        self.staged_tempdir = Some(tempdir().unwrap());
+
+        // calls self.submit_jobs, but that just returns for a non-remote target
     }
 
     fn get_x(&self, mvals: &Dvec) -> Extra {
@@ -173,8 +193,101 @@ impl Target {
         todo!()
     }
 
-    fn get_h(&self, mvals: &Dvec) -> Extra {
-        todo!()
+    /// Computes the objective function contribution and its gradient / Hessian.
+
+    /// First the low-level 'get' method is called with the analytic gradient
+    /// and Hessian both turned on. Then we loop through the fd1_pids and
+    /// compute the corresponding elements of the gradient by finite difference,
+    /// if the 'fdgrad' switch is turned on.
+
+    /// This is followed by looping through the fd2_pids and computing the
+    /// corresponding Hessian elements by finite difference. Forward finite
+    /// difference is used throughout for the sake of speed.
+    fn get_h(&mut self, mvals: &Dvec) -> Extra {
+        let ans = self.meta_get(mvals, true, true);
+        if self.fdhess {
+            todo!();
+        } else if self.fdhessdiag {
+            todo!();
+        }
+        self.hct += 1;
+        ans
+    }
+
+    /// this looks exactly like [Self::stage], followed by [Self::get]. Since we
+    /// already called `stage`, just jump to `get`
+    fn meta_get(&self, mvals: &Dvec, grad: bool, hess: bool) -> Extra {
+        self.get(mvals, grad, hess)
+    }
+
+    fn torsion_compute(&self, mvals: &Dvec) {
+        self.ff.make(mvals, self.staged_tempdir.as_ref().unwrap());
+    }
+
+    fn get(&self, mvals: &Dvec, grad: bool, hess: bool) -> Extra {
+        match &self.typ {
+            TargetType::Torsion {
+                pdb,
+                mol2,
+                coords,
+                metadata,
+                ndim,
+                freeze_atoms,
+                ns,
+                writelevel,
+                restrain_k,
+                attenuate,
+                energy_denom,
+                energy_upper,
+                wts,
+                eqm,
+            } => {
+                let mut answer = Extra::zeros(self.ff.np);
+
+                // this is inside compute, but we need ns from here. also not
+                // sure why he makes it a function only to call it immediately
+                // lmao
+                let compute = |mvals| {
+                    self.torsion_compute(mvals);
+                    let mut emms = Vec::new();
+                    let mut rmsds = Vec::new();
+                    // we only support OpenMM as an engine for now
+                    let engine = OpenMM::new();
+                    for i in 0..*ns {
+                        let (energy, rmsd, m_opt) = engine.optimize(i, false);
+                        emms.push(energy);
+                        rmsds.push(rmsd);
+                    }
+
+                    let emin =
+                        *emms.iter().min_by(|a, b| a.total_cmp(b)).unwrap();
+                    for e in emms.iter_mut() {
+                        *e -= emin;
+                    }
+                    let emms = Dvec::from(emms);
+                    let mut w = wts.clone();
+                    for w in w.iter_mut() {
+                        *w = w.sqrt();
+                    }
+                    let w = w / *energy_denom;
+                    let z = (emms - eqm);
+
+                    // TODO better way here, just lazy for now
+                    let mut ret = Vec::new();
+                    for (w, z) in w.iter().zip(z.iter()) {
+                        ret.push(w * z)
+                    }
+                    Dvec::from(ret)
+                };
+
+                let v = compute(mvals);
+                answer.0 = v.dot(&v);
+
+                let e_rmse = wts.dot((emms - eqm).powi(2));
+                todo!();
+            }
+            TargetType::OptGeo => todo!(),
+        }
     }
 }
 
@@ -194,6 +307,12 @@ impl Regularization {
 }
 
 pub(crate) struct Extra(f64, Dvec, Dmat);
+
+impl Extra {
+    pub(crate) fn zeros(n: usize) -> Self {
+        Self(0.0, Dvec::zeros(n), Dmat::zeros(n, n))
+    }
+}
 
 #[derive(Clone)]
 pub(crate) struct ObjMap {
@@ -320,6 +439,7 @@ impl Objective {
                     )
                     .unwrap();
                     let ns = mol.len();
+                    let (eqm, wts) = read_reference_data(&tgtdir, ns);
                     TargetType::Torsion {
                         pdb,
                         mol2: target.mol2.clone().unwrap(),
@@ -333,6 +453,8 @@ impl Objective {
                         attenuate: target.attenuate,
                         energy_denom: target.energy_denom,
                         energy_upper: target.energy_upper,
+                        wts,
+                        eqm,
                     }
                 }
                 config::TargetType::OptGeo => TargetType::OptGeo,
@@ -376,6 +498,7 @@ impl Objective {
                 write_indicate: true,
                 read_objective: true,
                 write_objective: true,
+                staged_tempdir: None,
             })
         }
         Self {
@@ -418,7 +541,7 @@ impl Objective {
 
     fn target_terms(&mut self, mvals: Dvec, order: i32) -> ObjMap {
         let mut objective = ObjMap::zeros(self.forcefield.np);
-        for tgt in &self.targets {
+        for tgt in self.targets.iter_mut() {
             // TODO consider borrowing
             tgt.stage(mvals.clone(), order >= 1, order >= 2);
         }
@@ -458,4 +581,24 @@ impl Objective {
 
         objective
     }
+}
+
+/// read reference ab initio data from a file called `qdata.txt` in `tgtdir`.
+fn read_reference_data(tgtdir: impl AsRef<Path>, ns: usize) -> (Dvec, Dvec) {
+    let f = tgtdir.as_ref().join("qdata.txt");
+    let f = File::open(f).unwrap();
+    let r = BufReader::new(f);
+    let mut eqm = Vec::new();
+    for line in r.lines().flatten() {
+        let split = line.split_ascii_whitespace().collect::<Vec<_>>();
+        if !split.is_empty() && split[0] == "ENERGY" {
+            eqm.push(split[1].parse().unwrap())
+        }
+    }
+
+    let mut wts = Dvec::from_element(ns, 1.0);
+    // the sum of ns ones is just ns...
+    wts /= ns as f64;
+
+    (Dvec::from(eqm), wts)
 }

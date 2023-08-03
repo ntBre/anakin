@@ -234,6 +234,64 @@ impl FF {
     pub(crate) fn make_redirect(&self, mvals: Dvec) {
         todo!()
     }
+
+    /// this is an insane method... superficially it just makes pvals from
+    /// `vals`, but it has the side effect of writing an xml file containing the
+    /// FF data!
+    pub(crate) fn make(&self, vals: &Dvec, dir: impl AsRef<Path>) -> Dvec {
+        let pvals = if self.use_pvals {
+            vals.clone()
+        } else {
+            // TODO ref? I think that might just move the clone deep into
+            // nalgebra instead of here so probably no difference
+            self.create_pvals(vals.clone())
+        };
+
+        assert_eq!(self.ffdata.len(), 1);
+
+        let mut newffdata = self.ffdata.clone().pop().unwrap();
+
+        // lookin pretty wet again
+        for (i, bond) in self.bonds_to_optimize.iter().enumerate() {
+            if let Param::Opt { inner } = bond {
+                // assume the unit has not been changed
+                for (p, field, _unit) in inner {
+                    let mut field =
+                        newffdata.bonds[i].as_hash_mut(field).unwrap();
+                    field.value = pvals[*p];
+                }
+            }
+        }
+
+        for (i, angle) in self.angles_to_optimize.iter().enumerate() {
+            if let Param::Opt { inner } = angle {
+                // assume the unit has not been changed
+                for (p, field, _unit) in inner {
+                    let mut field =
+                        newffdata.angles[i].as_hash_mut(field).unwrap();
+                    field.value = pvals[*p];
+                }
+            }
+        }
+
+        for (i, proper) in self.propers_to_optimize.iter().enumerate() {
+            if let Param::Opt { inner } = proper {
+                // assume the unit has not been changed
+                for (p, field, _unit) in inner {
+                    let mut field = newffdata.proper_torsions[i]
+                        .as_hash_mut(field)
+                        .unwrap();
+                    field.value = pvals[*p];
+                }
+            }
+        }
+
+        let fnm = self.fnms.first().unwrap();
+        let path = dir.as_ref().join(fnm);
+        std::fs::write(dbg!(path), newffdata.to_xml().unwrap()).unwrap();
+
+        pvals
+    }
 }
 
 fn mktransmat(np: usize, rs: &Dvec) -> (Dmat, Vec<usize>, Dmat) {

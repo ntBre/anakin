@@ -7,9 +7,9 @@ type Dvec = nalgebra::DVector<f64>;
 type Dmat = nalgebra::DMatrix<f64>;
 
 pub mod config;
+mod engine;
 pub mod forcefield;
 mod molecule;
-mod engine;
 pub mod objective;
 pub mod optimizer;
 mod utils;
