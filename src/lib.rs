@@ -1,5 +1,6 @@
 //! Rust version of the optimization package ForceBalance
 
+#![feature(lazy_cell)]
 #![allow(unused)]
 
 type Dvec = nalgebra::DVector<f64>;
