@@ -268,7 +268,7 @@ impl Target {
                     *w = w.sqrt();
                 }
                 let w = w / *energy_denom;
-                let z = (emms - eqm);
+                let z = (&emms - eqm);
 
                 // TODO better way here, just lazy for now
                 let mut ret = Vec::new();
@@ -279,8 +279,15 @@ impl Target {
 
                 answer.0 = v.dot(&v);
 
-                let e_rmse = wts.dot((emms - eqm).powi(2));
-                todo!();
+                let mut diff = &emms - eqm;
+                for d in diff.iter_mut() {
+                    *d *= *d;
+                }
+
+                // energy rmse
+                let e_rmse = wts.dot(&diff).sqrt();
+
+                todo!("compute gradients and hessian");
             }
             TargetType::OptGeo => todo!(),
         }
