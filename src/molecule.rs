@@ -2,9 +2,10 @@ use std::{error::Error, path::Path};
 
 use crate::{molecule::pdb::Pdb, Dmat};
 
-use self::pdb::Record;
+use self::{pdb::Record, xyz::Xyz};
 
 mod pdb;
+mod xyz;
 
 // TODO surely I need the xyzs from the .xyz file too. I expect we'll be reading
 // these files over and over in the future
@@ -17,7 +18,7 @@ pub(crate) struct Molecule {
     /// molecule. comes from read_pdb, overwriting earlier values from read_xyz
     xyzs: Dmat,
 
-    /// vector of atomic symbols. TODO supposed to come from read_xyz
+    /// vector of atomic symbols
     elem: Vec<String>,
 
     /// vector of bond connections. TODO comes from build_topology
@@ -36,6 +37,7 @@ impl Molecule {
         Q: AsRef<Path>,
     {
         let load_fnm = filename.as_ref();
+        let xyz = Xyz::load(load_fnm)?;
         let fnm = topology.as_ref();
         let pdb = Pdb::load(fnm)?;
 
@@ -48,12 +50,11 @@ impl Molecule {
             };
         }
 
-        let mut elem = Vec::new();
         let mut bonds = Vec::new();
 
         Ok(Self {
             xyzs: Dmat::from_row_slice(rows, 3, &xyzs),
-            elem,
+            elem: xyz.elem,
             bonds,
         })
     }
@@ -122,6 +123,9 @@ mod tests {
                 (9, 12), (12, 13), (12, 23), (13, 24), (13, 25),
             ],
         };
+        assert_eq!(got.xyzs, want.xyzs);
+        assert_eq!(got.elem, want.elem);
+        assert_eq!(got.bonds, want.bonds);
         assert_eq!(got, want);
     }
 }
