@@ -32,6 +32,7 @@ struct Metadata {
     torsion_grid_ids: Vec<Vec<isize>>,
 }
 
+#[allow(clippy::large_enum_variant)]
 enum TargetType {
     // TODO some of these are likely shared options. I've seen at least
     // writelevel on both already
