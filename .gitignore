@@ -1,1 +1,4 @@
 /target
+/python/optimize.sav
+/python/optimize.tmp/
+/python/smirnoff_parameter_assignments.json
