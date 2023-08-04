@@ -11,7 +11,7 @@ use tempfile::{tempdir, TempDir};
 
 use crate::{
     config::{self, Config},
-    engine::OpenMM,
+    engine::Engine,
     forcefield::FF,
     molecule::Molecule,
     work_queue::WorkQueue,
@@ -255,7 +255,7 @@ impl Target {
                 let mut emms = Vec::new();
                 let mut rmsds = Vec::new();
                 // we only support OpenMM as an engine for now
-                let engine = OpenMM::new();
+                let engine = Engine::new();
                 for i in 0..*ns {
                     let (energy, rmsd, m_opt) = engine.optimize(i, false);
                     emms.push(energy);
