@@ -1,0 +1,74 @@
+* Line Survey
+  #+name: survey
+  | File                 | Lines | Status | Description               |
+  |----------------------+-------+--------+---------------------------|
+  | molecule.py          |  4900 |        |                           |
+  | PDB.py               |  2523 | 178    |                           |
+  | optimizer.py         |  2422 |        |                           |
+  | amberio.py           |  1927 | d      |                           |
+  | openmmio.py          |  1913 |        |                           |
+  | parser.py            |  1701 |        |                           |
+  | gmxio.py             |  1651 | d      |                           |
+  | nifty.py             |  1611 |        |                           |
+  | forcefield.py        |  1593 |        |                           |
+  | liquid.py            |  1189 |        |                           |
+  | abinitio.py          |  1184 |        |                           |
+  | tinkerio.py          |  1153 |        |                           |
+  | target.py            |  1080 |        |                           |
+  | smirnoffio.py        |  1071 |        |                           |
+  | objective.py         |   866 |        |                           |
+  | evaluator_io.py      |   848 |        |                           |
+  | lipid.py             |   841 | d      |                           |
+  | Mol2.py              |   626 | d      |                           |
+  | psi4io.py            |   543 | d      |                           |
+  | opt_geo_target.py    |   532 |        |                           |
+  | _version.py          |   520 |        |                           |
+  | thermo.py            |   507 | d      |                           |
+  | readfrq.py           |   483 | d      |                           |
+  | hydration.py         |   443 | d      |                           |
+  | hessian.py           |   324 |        |                           |
+  | recharge_io.py       |   311 |        |                           |
+  | torsion_profile.py   |   305 | x      | target class for torsions |
+  | quantity.py          |   302 | d      |                           |
+  | binding.py           |   258 | d      |                           |
+  | interaction.py       |   242 | d      |                           |
+  | vibration.py         |   215 |        |                           |
+  | moments.py           |   201 | d      |                           |
+  | chemistry.py         |   199 | d      |                           |
+  | finite_difference.py |   184 |        |                           |
+  | counterpoise.py      |   180 | d      |                           |
+  | smirnoff_hack.py     |   166 |        |                           |
+  | __init__.py            |   143 |        |                           |
+  | leastsq.py           |   128 | d      |                           |
+  | abinitio_internal.py |   105 |        |                           |
+  | qchemio.py           |    98 | d      |                           |
+  | engine.py            |    94 |        |                           |
+  | output.py            |    92 |        |                           |
+  | custom_io.py         |    76 | d      |                           |
+  | PT.py                |    26 | n      | the periodic table        |
+  |----------------------+-------+--------+---------------------------|
+  | total                | 35776 |        |                           |
+
+  #+name: key
+  | Status | Meaning                                             |
+  |--------+-----------------------------------------------------|
+  | d      | deleted in [[https://github.com/openforcefield/openff-forcebalance][openff-forcebalance]]                      |
+  | x      | finished here                                       |
+  | n      | not needed                                          |
+  | number | lines finished, either written, comments, or blanks |
+
+  #+begin_src awk :stdin survey
+    NR > 1 && $1 !~ /^total$/ {
+	if ($3 ~ /^[xdn]$/) done += $2
+	if ($3 ~ /^[0-9]+$/) done += $3
+    }
+    $1 ~ /^total$/ { total = $2 }
+    END { printf "%d / %d (%.1f%%) done\n", done, total, 100.0 * done / total }
+  #+end_src
+
+  #+RESULTS:
+  : 9214 / 35776 (25.8%) done
+
+# Local Variables:
+# org-confirm-babel-evaluate: nil
+# End:
