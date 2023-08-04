@@ -120,7 +120,7 @@ pub(crate) struct Target {
     epsgrad: f64,
 
     /// "dictionary" of whether to call the derivatives
-    pgrad: Vec<bool>,
+    pgrad: Vec<usize>,
 
     /// relative directory of the target
     tgtdir: PathBuf,
@@ -171,6 +171,9 @@ pub(crate) struct Target {
 
     /// initially None, Some after calling [Self::stage]
     staged_tempdir: Option<TempDir>,
+
+    /// initially default, set on the first non-finite-difference call to `get`
+    objective: f64,
 }
 
 impl Target {
@@ -216,7 +219,7 @@ impl Target {
 
     /// this looks exactly like [Self::stage], followed by [Self::get]. Since we
     /// already called `stage`, just jump to `get`
-    fn meta_get(&self, mvals: &Dvec, grad: bool, hess: bool) -> Extra {
+    fn meta_get(&mut self, mvals: &Dvec, grad: bool, hess: bool) -> Extra {
         self.get(mvals, grad, hess)
     }
 
@@ -224,7 +227,7 @@ impl Target {
         self.ff.make(mvals, self.staged_tempdir.as_ref().unwrap());
     }
 
-    fn get(&self, mvals: &Dvec, grad: bool, hess: bool) -> Extra {
+    fn get(&mut self, mvals: &Dvec, grad: bool, hess: bool) -> Extra {
         match &self.typ {
             TargetType::Torsion {
                 pdb,
@@ -287,7 +290,27 @@ impl Target {
                 // energy rmse
                 let e_rmse = wts.dot(&diff).sqrt();
 
-                todo!("compute gradients and hessian");
+                let dv = Dmat::zeros(self.ff.np, v.len());
+                if grad || hess {
+                    for p in dbg!(&self.pgrad) {
+                        todo!("wacky f12d3p call");
+                    }
+                }
+
+                for &p in &self.pgrad {
+                    answer.1[p] = 2.0 * v.dot(&dv.row(p));
+                    for &q in &self.pgrad {
+                        // this certainly looks like a matrix multiply
+                        answer.2[(p, q)] = 2.0 * dv.row(p).dot(&dv.row(q));
+                    }
+                }
+
+                if !in_fd() {
+                    self.objective = answer.0;
+                    self.ff.make(mvals, self.staged_tempdir.as_ref().unwrap());
+                }
+
+                answer
             }
             TargetType::OptGeo => todo!(),
         }
@@ -488,7 +511,7 @@ impl Objective {
                 rd: PathBuf::from(target.read.clone().unwrap_or_default()),
                 zerograd: config.zerograd,
                 epsgrad: target.epsgrad,
-                pgrad: vec![true; forcefield.np],
+                pgrad: (0..forcefield.np).collect(),
                 tgtdir,
                 tempbase,
                 tempdir,
@@ -502,6 +525,7 @@ impl Objective {
                 read_objective: true,
                 write_objective: true,
                 staged_tempdir: None,
+                objective: 0.0,
             })
         }
         Self {
