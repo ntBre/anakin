@@ -3,6 +3,7 @@ use std::{
     fs::File,
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
+    rc::Rc,
 };
 
 use log::{debug, error};
@@ -22,7 +23,7 @@ use self::penalty::{Penalty, PenaltyType};
 
 pub(crate) mod penalty;
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 struct Metadata {
     dihedrals: Vec<Vec<usize>>,
     grid_spacing: Vec<usize>,
@@ -32,6 +33,7 @@ struct Metadata {
     torsion_grid_ids: Vec<Vec<isize>>,
 }
 
+#[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
 enum TargetType {
     // TODO some of these are likely shared options. I've seen at least
@@ -70,11 +72,12 @@ enum TargetType {
     OptGeo,
 }
 
+#[derive(Clone)]
 pub(crate) struct Target {
     // options from Target base class
     /// root directory of the whole project. probably redundant with the same
     /// value on FF
-    root: PathBuf,
+    pub(crate) root: PathBuf,
 
     /// name of the target
     name: String,
@@ -124,21 +127,21 @@ pub(crate) struct Target {
     pgrad: Vec<usize>,
 
     /// relative directory of the target
-    tgtdir: PathBuf,
+    pub(crate) tgtdir: PathBuf,
 
     /// temporary working directory. set to temp/target_name. used for storing
     /// temporary variables that don't change through the course of the
     /// optimization
     tempbase: PathBuf,
 
-    tempdir: PathBuf,
+    pub(crate) tempdir: PathBuf,
 
     /// the directory in which the simulation is running - this can be updated
     rundir: PathBuf,
 
     /// need the forcefield (here for now). NOTE: this seems insane. I'm going
     /// to use so much memory if I clone forcefields onto every target
-    ff: FF,
+    pub(crate) ff: FF,
 
     /// counts how often the objective function was computed
     xct: usize,
@@ -171,7 +174,7 @@ pub(crate) struct Target {
     openmm_platform: String,
 
     /// initially None, Some after calling [Self::stage]
-    staged_tempdir: Option<TempDir>,
+    staged_tempdir: Option<Rc<TempDir>>,
 
     /// initially default, set on the first non-finite-difference call to `get`
     objective: f64,
@@ -184,7 +187,7 @@ impl Target {
         // instead of all the work making a directory in the Python version,
         // just grab a tempdir automagically. it should be deleted automaticaly
         // when we set staged_tempdir back to None too.
-        self.staged_tempdir = Some(tempdir().unwrap());
+        self.staged_tempdir = Some(Rc::new(tempdir().unwrap()));
 
         // calls self.submit_jobs, but that just returns for a non-remote target
     }
@@ -225,7 +228,7 @@ impl Target {
     }
 
     fn torsion_compute(&self, mvals: &Dvec) {
-        self.ff.make(mvals, self.staged_tempdir.as_ref().unwrap());
+        self.ff.make(mvals, self.staged_tempdir());
     }
 
     fn get(&mut self, mvals: &Dvec, grad: bool, hess: bool) -> Extra {
@@ -255,7 +258,7 @@ impl Target {
                 let mut emms = Vec::new();
                 let mut rmsds = Vec::new();
                 // we only support OpenMM as an engine for now
-                let engine = Engine::new();
+                let engine = Engine::new(self.clone());
                 for i in 0..*ns {
                     let (energy, rmsd, m_opt) = engine.optimize(i, false);
                     emms.push(energy);
@@ -308,13 +311,19 @@ impl Target {
 
                 if !in_fd() {
                     self.objective = answer.0;
-                    self.ff.make(mvals, self.staged_tempdir.as_ref().unwrap());
+                    self.ff.make(mvals, self.staged_tempdir());
                 }
 
                 answer
             }
             TargetType::OptGeo => todo!(),
         }
+    }
+
+    /// unwraps `self.staged_tempdir` and converts it to a &TempDir
+    #[inline]
+    pub(crate) fn staged_tempdir(&self) -> &TempDir {
+        self.staged_tempdir.as_ref().unwrap().as_ref()
     }
 }
 

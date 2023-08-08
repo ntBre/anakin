@@ -68,15 +68,6 @@ priors
 
 $end
 
-$target
-name opt-geo-batch-0
-weight 0.01
-
-type OptGeoTarget_SMIRNOFF
-
-writelevel 1
-remote 0
-$end
 
 
 $target
@@ -99,3 +90,12 @@ remote 0
 $end
 
 
+$target
+name opt-geo-batch-0
+weight 0.01
+
+type OptGeoTarget_SMIRNOFF
+
+writelevel 1
+remote 0
+$end

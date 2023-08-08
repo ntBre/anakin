@@ -1,16 +1,86 @@
+use std::{collections::HashMap, path::PathBuf};
+
+use openff_toolkit::smirnoff::ForceField;
+use openmm::{
+    integrators::{Integrator, Verlet},
+    Modeller, PDBFile, Simulation,
+};
+
+use crate::{forcefield::FF, objective::Target};
+
 /// this corresponds to the SMIRNOFF class in ForceBalance, which is a subclass
 /// of OpenMM. basically it's just an interface to openmm
-pub(crate) struct Engine {
+pub(crate) struct Engine<I>
+where
+    I: Integrator,
+{
+    valkwd: Vec<String>,
+    name: String,
+    target: Target,
+    root: PathBuf,
+    srcdir: PathBuf,
+    tempdir: PathBuf,
+    ff: FF,
     restraint_frc_index: Option<usize>,
+
+    /// the actual simulation. initially none, set up later
+    simulation: Option<Simulation<I>>,
+
+    /// initially empty, generated in prepare
+    real_atom_idxs: Vec<usize>,
 }
 
-impl Engine {
+impl Engine<Verlet> {
     /// initialization actually just seems to consist of setting up directories.
-    /// not sure what options actually need to be stored at the moment
-    pub(crate) fn new() -> Self {
-        Self {
+    /// not sure what options actually need to be stored at the moment. NOTE:
+    /// target is supposed to be kwargs but we obviously don't have kwargs
+    pub(crate) fn new(target: Target) -> Self {
+        // let pdb = PDBFile::new("testfiles/test.pdb");
+        // let mut m = Modeller::new(pdb.topology, pdb.positions);
+        // let ff = ForceField::load("testfiles/force-field.offxml").unwrap();
+        // let topology = m.topology;
+        // let system = ff.create_system(topology);
+        // let integrator = Verlet::new(1.0);
+        // let simulation = Simulation::new(topology, system, integrator);
+        let mut ret = Self {
             restraint_frc_index: None,
-        }
+            simulation: None,
+            valkwd: vec![
+                // these are from smirnoffio
+                "ffxml".to_string(),
+                "pdb".to_string(),
+                "mol2".to_string(),
+                "platname".to_string(),
+                "precision".to_string(),
+                "mmopts".to_string(),
+                "vsite_bonds".to_string(),
+                "implicit_solvent".to_string(),
+                "restrain_k".to_string(),
+                "freeze_atoms".to_string(),
+                // these are from engine
+                "mol".to_string(),
+                "coords".to_string(),
+                "name".to_string(),
+                "target".to_string(),
+                "pbc".to_string(),
+                "FF".to_string(),
+                "nonbonded_method".to_string(),
+                "nonbonded_cutoff".to_string(),
+            ],
+            name: "openmm".to_string(),
+            srcdir: target.root.join(&target.tgtdir),
+            tempdir: target.root.join(&target.tempdir),
+            root: target.root.clone(),
+            ff: target.ff.clone(),
+            target,
+            real_atom_idxs: Vec::new(),
+        };
+        ret.set_opts();
+        ret
+    }
+
+    fn set_opts(&mut self) {
+        todo!()
     }
 
     /// optimize the geometry and align the optimized geometry to the starting
@@ -38,8 +108,19 @@ impl Engine {
             todo!()
         }
 
-        let x0 = self.simulation.context.get_state().get_positions()
-            [self.real_atom_idxs];
+        use openmm::state::DataType as D;
+        let positions = self
+            .simulation
+            .as_ref()
+            .unwrap()
+            .context
+            .get_state(D::Positions)
+            .get_positions();
+
+        let x0 = positions
+            .into_iter()
+            .enumerate()
+            .filter(|(p, _)| self.real_atom_idxs.contains(p));
         todo!();
     }
 
