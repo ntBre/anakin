@@ -3,6 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use openff_toolkit::smirnoff::ForceField;
 use openmm::{
     integrators::{Integrator, Verlet},
+    platform::Platform,
     Modeller, PDBFile, Simulation,
 };
 
@@ -28,6 +29,15 @@ where
 
     /// initially empty, generated in prepare
     real_atom_idxs: Vec<usize>,
+
+    platname: String,
+
+    precision: String,
+
+    /// initially empty, set to Some in Self::set_opts
+    platform: Option<Platform>,
+
+    ism: Option<()>,
 }
 
 impl Engine<Verlet> {
@@ -74,12 +84,35 @@ impl Engine<Verlet> {
             ff: target.ff.clone(),
             target,
             real_atom_idxs: Vec::new(),
+            platname: Default::default(),
+            precision: Default::default(),
+            platform: Default::default(),
+            ism: Default::default(),
         };
         ret.set_opts();
+        ret.read_src();
         ret
     }
 
+    /// set OpenMM-specific options
     fn set_opts(&mut self) {
+        // TODO these are supposed to come from self.target, but I don't have
+        // those fields on Target. just taking them as defaults
+        self.platname = "Reference".to_owned();
+        self.precision = "double".to_owned();
+
+        // TODO could check that platname is a registered OpenMM Platform, but I
+        // don't really care. just assume it is registered.
+
+        self.platform = Some(Platform::by_name(&self.platname));
+        // TODO check if platname is CUDA or OpenCL, but we're sticking with
+        // Reference for now
+        self.ism = None;
+    }
+
+    /// read files from the source directory. Provide a molecule object or a
+    /// coordinate file. Add an optional PDB file for residues, atom names, etc.
+    fn read_src(&mut self) {
         todo!()
     }
 
