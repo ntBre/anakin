@@ -101,7 +101,120 @@ impl Molecule {
     }
 
     pub(crate) fn from_path(fnm: impl AsRef<Path>) -> Self {
-        todo!();
+        let path = fnm.as_ref();
+        assert_eq!(
+            path.extension().unwrap(),
+            "pdb",
+            "given {path:?}, but I only know .pdb"
+        );
+        // in lined from Molecule.read_pdb
+        let parsed_pdb = Pdb::load(path).unwrap();
+
+        let mut pdblines = vec![vec![]];
+        let mut pdbterms = Vec::new();
+        let mut read_terms = true;
+        for record in &parsed_pdb.records {
+            match record {
+                Record::Atom { .. } => {
+                    pdblines.last_mut().unwrap().push(record);
+                    if read_terms {
+                        pdbterms.push(0);
+                    }
+                }
+                Record::Ter { .. } if read_terms => {
+                    let t = pdbterms.last_mut().unwrap();
+                    *t = 1;
+                }
+                // if there's an END record (which I don't currently read)
+                // that's when you push a new vec onto the end of pdblines and
+                // reset read_terms
+                _ => {}
+            }
+        }
+
+        let x = &pdblines[0];
+
+        // np.array in fb but pretty sure it's not even used
+        let xl = x.len();
+        let mut xyz = Vec::with_capacity(xl);
+        let mut alt_locs = Vec::with_capacity(xl);
+        // don't have these right now
+        // let mut icodes = Vec::with_capacity(xl);
+        // let mut chain_id = Vec::with_capacity(xl);
+        let mut atom_names = Vec::with_capacity(xl);
+        let mut residue_names = Vec::with_capacity(xl);
+        let mut residue_id = Vec::with_capacity(xl);
+        for record in x {
+            let Record::Atom {
+                serial,
+                name,
+                alt_loc,
+                res_name,
+                res_seq,
+                x,
+                y,
+                z,
+                occupancy,
+                temp_factor,
+                element,
+            } = record
+            else {
+                continue;
+            };
+            xyz.push([*x / 10., *y / 10., *z / 10.]);
+            alt_locs.push(alt_loc);
+            atom_names.push(name);
+            residue_names.push(res_name);
+            residue_id.push(res_seq);
+        }
+
+        let mut xyz_list = Vec::new();
+        for model in &pdblines {
+            let mut new_xyz = Vec::new();
+            for x in model {
+                let Record::Atom { x, y, z, .. } = x else {
+                    continue;
+                };
+                new_xyz.push([*x, *y, *z]);
+            }
+            if xyz_list.len() == 0 {
+                xyz_list.push(new_xyz);
+            } else if xyz_list.len() >= 1 {
+                // supposed to check that the shape of new_xyz matches the
+                // last element of xyz_list, but I'm only going to have one
+                // of these anyway
+                xyz_list.push(new_xyz);
+            }
+        }
+
+        // build a list of chemical elements
+        let mut elem = Vec::new();
+        for i in 0..atom_names.len() {
+            let Record::Atom { element, .. } = &x[i] else {
+                continue;
+            };
+            elem.push(element.clone());
+        }
+
+        let mut bonds = Vec::new();
+        for record in &parsed_pdb.records {
+            match record {
+                Record::Conect { atoms } => {
+                    let mut atoms = atoms.iter();
+                    let a = atoms.next().unwrap();
+                    for b in atoms {
+                        bonds.push((a.min(b) - 1, a.max(b) - 1));
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let rows = xyz_list[0].len();
+        let xyzs = std::mem::take(&mut xyz_list[0]).into_iter().flatten();
+        let xyzs = Dmat::from_row_iterator(rows, 3, xyzs);
+
+        Self { xyzs, elem, bonds }
     }
 
     pub(crate) fn len(&self) -> usize {
