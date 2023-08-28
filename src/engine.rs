@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use openff_toolkit::smirnoff::ForceField;
 use openmm::{
@@ -7,7 +10,10 @@ use openmm::{
     Modeller, PDBFile, Simulation,
 };
 
-use crate::{forcefield::FF, objective::Target};
+use crate::{
+    forcefield::FF, molecule::Molecule, objective::Target,
+    objective::TargetType,
+};
 
 /// this corresponds to the SMIRNOFF class in ForceBalance, which is a subclass
 /// of OpenMM. basically it's just an interface to openmm
@@ -38,6 +44,12 @@ where
     platform: Option<Platform>,
 
     ism: Option<()>,
+
+    // these are initially None/empty and then initialized in `read_src`
+    mol: Option<Molecule>,
+    ref_mol: Option<Molecule>,
+    mol2: Vec<String>,
+    abspdb: Option<PathBuf>,
 }
 
 impl Engine<Verlet> {
@@ -88,9 +100,33 @@ impl Engine<Verlet> {
             precision: Default::default(),
             platform: Default::default(),
             ism: Default::default(),
+            mol: None,
+            ref_mol: None,
+            mol2: Vec::new(),
+            abspdb: None,
         };
         ret.set_opts();
-        ret.read_src();
+        let TargetType::Torsion {
+            pdb,
+            mol2,
+            coords,
+            metadata,
+            ndim,
+            freeze_atoms,
+            ns,
+            writelevel,
+            restrain_k,
+            attenuate,
+            energy_denom,
+            energy_upper,
+            wts,
+            eqm,
+            mol,
+        } = &ret.target.typ
+        else {
+            panic!("can't handle this type yet");
+        };
+        ret.read_src(&pdb.clone(), mol.clone(), vec![mol2.clone()]);
         ret
     }
 
@@ -112,8 +148,24 @@ impl Engine<Verlet> {
 
     /// read files from the source directory. Provide a molecule object or a
     /// coordinate file. Add an optional PDB file for residues, atom names, etc.
-    fn read_src(&mut self) {
-        todo!()
+    /// `pdb` is a PDB file, `mol` is a [Molecule], `mol2` is a list of .mol2
+    /// files. In forcebalance these are all passed as kwargs
+    fn read_src(&mut self, pdb: &str, mol: Molecule, mol2: Vec<String>) {
+        let pdbfnm = self.target.root.join(&self.target.tgtdir).join(pdb);
+        assert!(pdbfnm.exists(), "PDB file {:?} does not exist", pdbfnm);
+        self.mol = Some(mol);
+        self.mol2 = mol2;
+        for fnm in &self.mol2 {
+            let p = self.target.root.join(&self.target.tgtdir).join(&fnm);
+            assert!(p.exists(), "file {p:?} does not exist");
+        }
+        self.abspdb = Some(pdbfnm.canonicalize().unwrap());
+        let mpdb = Molecule::from_path(pdbfnm);
+
+        // TODO might have to set self.mol.Data.[chain, atomname, resid,
+        // resname, elem]
+
+        self.ref_mol = self.mol.clone();
     }
 
     /// optimize the geometry and align the optimized geometry to the starting

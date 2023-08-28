@@ -24,7 +24,7 @@ use self::penalty::{Penalty, PenaltyType};
 pub(crate) mod penalty;
 
 #[derive(Clone, Deserialize)]
-struct Metadata {
+pub(crate) struct Metadata {
     dihedrals: Vec<Vec<usize>>,
     grid_spacing: Vec<usize>,
     dihedral_ranges: Option<usize>,
@@ -35,7 +35,7 @@ struct Metadata {
 
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
-enum TargetType {
+pub(crate) enum TargetType {
     // TODO some of these are likely shared options. I've seen at least
     // writelevel on both already
     Torsion {
@@ -68,6 +68,8 @@ enum TargetType {
         wts: Dvec,
 
         eqm: Dvec,
+
+        mol: Molecule,
     },
     OptGeo,
 }
@@ -83,7 +85,7 @@ pub(crate) struct Target {
     name: String,
 
     /// type of target
-    typ: TargetType,
+    pub(crate) typ: TargetType,
 
     /// relative weight of the target
     weight: f64,
@@ -248,6 +250,7 @@ impl Target {
                 energy_upper,
                 wts,
                 eqm,
+                mol,
             } => {
                 let mut answer = Extra::zeros(self.ff.np);
 
@@ -476,6 +479,11 @@ impl Objective {
                     .unwrap();
                     let ns = mol.len();
                     let (eqm, wts) = read_reference_data(&tgtdir, ns);
+                    let mol = Molecule::new(
+                        root.join(&tgtdir).join(&coords),
+                        root.join(&tgtdir).join(&pdb),
+                    )
+                    .unwrap();
                     TargetType::Torsion {
                         pdb,
                         mol2: target.mol2.clone().unwrap(),
@@ -491,6 +499,7 @@ impl Objective {
                         energy_upper: target.energy_upper,
                         wts,
                         eqm,
+                        mol,
                     }
                 }
                 config::TargetType::OptGeo => TargetType::OptGeo,

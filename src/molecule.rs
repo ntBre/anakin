@@ -51,7 +51,7 @@ const RADII: [f64; 96] = [
 
 /// Molecule.Data gets copied into from the read_pdb return value (Answer), so
 /// our Molecule has the same fields as Answer
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Molecule {
     /// an N x 3 matrix containing the x, y, z coordinates for the atoms in the
     /// molecule. comes from read_pdb, overwriting earlier values from read_xyz
@@ -98,6 +98,10 @@ impl Molecule {
         ret.build_bonds();
 
         Ok(ret)
+    }
+
+    pub(crate) fn from_path(fnm: impl AsRef<Path>) -> Self {
+        todo!();
     }
 
     pub(crate) fn len(&self) -> usize {
