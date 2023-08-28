@@ -23,7 +23,7 @@ pub struct FF {
     pub(crate) root: PathBuf,
 
     /// force field names
-    fnms: Vec<String>,
+    pub(crate) fnms: Vec<String>,
 
     /// force field directory relative to the project directory
     ffdir: String,
@@ -44,7 +44,7 @@ pub struct FF {
     amoeba_eps: f64,
 
     /// Switch for rigid water molecules
-    rigid_water: bool,
+    pub(crate) rigid_water: bool,
 
     /// Switch for constraining bonds involving hydrogen
     constrain_h: bool,
@@ -72,9 +72,9 @@ pub struct FF {
     /// `ffdata_isxml`, `offxml`, and `openff_forcefield` should all be combined
     /// into a single field probably called `forcefield` (as I had
     /// originally...)
-    offxml: String,
+    pub(crate) offxml: String,
 
-    openff_forcefield: ForceField,
+    pub(crate) openff_forcefield: ForceField,
 
     /// improved representation of pfields as a networkx graph. NOTE: please,
     /// please, please let this be unused.

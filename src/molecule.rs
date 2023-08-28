@@ -84,7 +84,7 @@ impl Graph {
 pub(crate) struct Molecule {
     /// an N x 3 matrix containing the x, y, z coordinates for the atoms in the
     /// molecule. comes from read_pdb, overwriting earlier values from read_xyz
-    xyzs: Dmat,
+    pub(crate) xyzs: Dmat,
 
     /// vector of atomic symbols
     elem: Vec<String>,

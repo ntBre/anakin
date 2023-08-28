@@ -4,15 +4,17 @@ use std::{
 };
 
 use openff_toolkit::smirnoff::ForceField;
+use openff_toolkit::topology::molecule::Molecule as OffMolecule;
 use openmm::{
     integrators::{Integrator, Verlet},
     platform::Platform,
+    topology::Vec3,
     Modeller, PDBFile, Simulation,
 };
 
 use crate::{
     forcefield::FF, molecule::Molecule, objective::Target,
-    objective::TargetType,
+    objective::TargetType, Dvec,
 };
 
 /// this corresponds to the SMIRNOFF class in ForceBalance, which is a subclass
@@ -50,6 +52,7 @@ where
     ref_mol: Option<Molecule>,
     mol2: Vec<String>,
     abspdb: Option<PathBuf>,
+    pdb: Option<PDBFile>,
 }
 
 impl Engine<Verlet> {
@@ -104,7 +107,9 @@ impl Engine<Verlet> {
             ref_mol: None,
             mol2: Vec::new(),
             abspdb: None,
+            pdb: None,
         };
+        // Step 1: set up options
         ret.set_opts();
         let TargetType::Torsion {
             pdb,
@@ -126,7 +131,10 @@ impl Engine<Verlet> {
         else {
             panic!("can't handle this type yet");
         };
+        // Step 2: Read data from the source directory
         ret.read_src(&pdb.clone(), mol.clone(), vec![mol2.clone()]);
+        // Step 3: Prepare the temporary directory
+        ret.prepare();
         ret
     }
 
@@ -218,5 +226,69 @@ impl Engine<Verlet> {
 
     fn set_positions(&self, shot: usize) {
         todo!()
+    }
+
+    /// Prepare the calculation. Note that we don't create the Simulation object
+    /// yet because that may depend on MD integrator parameters, thermostat,
+    /// barostat, etc. This is mostly copied from OpenMM.prepare(), but we are
+    /// calling ForceField from the OpenFF toolkit and ignoring AMOEBA stuff.
+    fn prepare(&mut self) {
+        if let Some(pdb) = &self.abspdb {
+            self.pdb = Some(PDBFile::new(pdb));
+        }
+        // load mol2 files for smirnoff topology
+        let openff_mols = Vec::new();
+        for fnm in self.mol2 {
+            openff_mols.push(OffMolecule::from_file(fnm));
+        }
+        self.off_topology = OffTopology
+            .from_openmm(self.pdb.as_ref().unwrap().topology, openff_mols);
+        self.restrain_k = 1.0;
+        // TODO where did this come from?? I know it's from kwargs, but where
+        // did it get determined
+        self.freeze_atoms = vec![5, 6, 7, 8];
+
+        // TODO add this to self.mmopts
+        // self.ff.rigid_water;
+        self.ff.make(&Dvec::zeros(self.ff.np), self.tempdir);
+
+        // periodic boundary conditions
+        self.pbc = false;
+
+        // Apply the FF parameters to the system. Currently this is the only way
+        // to determine if the FF will apply virtual sites to the system.
+        let interchange = self
+            .ff
+            .openff_forcefield
+            .create_interchange(self.off_topology);
+
+        self.has_virtual_sites = !interchange.virtual_sites.is_empty();
+
+        // handled by default
+        self.xyz_omms = Vec::new();
+        // NOTE: no outer loop because I only have one xyz for now
+        let mol = self.mol.as_ref().unwrap();
+        let mut xyz_omm = Vec::new();
+        for x in mol.xyzs.row_iter() {
+            xyz_omm.push(Vec3::new(x[0], x[1], x[2]));
+        }
+        // TODO if I support pbc, obtain the box here
+        self.xyz_omms.push((xyz_omm, None));
+        let openmm_topology = interchange.to_openmm_topology();
+        // TODO might need some unit conversion / appending placehold positions
+        // for v sites
+        let openmm_positions = self.pdb.as_ref().unwrap().positions;
+        self.modeller = Modeller::new(openmm_topology, openmm_positions);
+
+        // build a topology and atom lists. BRW: why do we do this over and over
+        // in different formats?
+        let top = self.modeller.get_topology();
+        let atoms = top.atoms();
+
+        // TODO some weird atom_lists stuff in smirnoffio.py, skipping for now
+        for f in self.ff.fnms {
+            std::fs::remove_file(f).unwrap();
+        }
+        todo!();
     }
 }
