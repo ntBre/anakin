@@ -5,6 +5,7 @@ use std::{
 
 use openff_toolkit::smirnoff::ForceField;
 use openff_toolkit::topology::molecule::Molecule as OffMolecule;
+use openff_toolkit::topology::Topology as OffTopology;
 use openmm::{
     integrators::{Integrator, Verlet},
     platform::Platform,
@@ -16,6 +17,9 @@ use crate::{
     forcefield::FF, molecule::Molecule, objective::Target,
     objective::TargetType, Dvec,
 };
+
+/// box for periodic boundary conditions
+struct PBox;
 
 /// this corresponds to the SMIRNOFF class in ForceBalance, which is a subclass
 /// of OpenMM. basically it's just an interface to openmm
@@ -53,6 +57,13 @@ where
     mol2: Vec<String>,
     abspdb: Option<PathBuf>,
     pdb: Option<PDBFile>,
+    off_topology: Option<OffTopology>,
+    restrain_k: f64,
+    freeze_atoms: Vec<usize>,
+    pbc: bool,
+    has_virtual_sites: bool,
+    xyz_omms: Vec<(Vec<Vec3>, Option<PBox>)>,
+    modeller: Option<Modeller>,
 }
 
 impl Engine<Verlet> {
@@ -108,6 +119,13 @@ impl Engine<Verlet> {
             mol2: Vec::new(),
             abspdb: None,
             pdb: None,
+            off_topology: None,
+            restrain_k: 1.0,
+            freeze_atoms: Vec::new(),
+            pbc: false,
+            has_virtual_sites: false,
+            xyz_omms: Vec::new(),
+            modeller: None,
         };
         // Step 1: set up options
         ret.set_opts();
@@ -237,12 +255,14 @@ impl Engine<Verlet> {
             self.pdb = Some(PDBFile::new(pdb));
         }
         // load mol2 files for smirnoff topology
-        let openff_mols = Vec::new();
-        for fnm in self.mol2 {
+        let mut openff_mols = Vec::new();
+        for fnm in &self.mol2 {
             openff_mols.push(OffMolecule::from_file(fnm));
         }
-        self.off_topology = OffTopology
-            .from_openmm(self.pdb.as_ref().unwrap().topology, openff_mols);
+        self.off_topology = Some(OffTopology::from_openmm(
+            &self.pdb.as_ref().unwrap().topology,
+            openff_mols,
+        ));
         self.restrain_k = 1.0;
         // TODO where did this come from?? I know it's from kwargs, but where
         // did it get determined
@@ -250,7 +270,7 @@ impl Engine<Verlet> {
 
         // TODO add this to self.mmopts
         // self.ff.rigid_water;
-        self.ff.make(&Dvec::zeros(self.ff.np), self.tempdir);
+        self.ff.make(&Dvec::zeros(self.ff.np), &self.tempdir);
 
         // periodic boundary conditions
         self.pbc = false;
@@ -260,12 +280,11 @@ impl Engine<Verlet> {
         let interchange = self
             .ff
             .openff_forcefield
-            .create_interchange(self.off_topology);
+            .create_interchange(self.off_topology.as_ref().unwrap());
 
         self.has_virtual_sites = !interchange.virtual_sites.is_empty();
 
         // handled by default
-        self.xyz_omms = Vec::new();
         // NOTE: no outer loop because I only have one xyz for now
         let mol = self.mol.as_ref().unwrap();
         let mut xyz_omm = Vec::new();
@@ -277,16 +296,16 @@ impl Engine<Verlet> {
         let openmm_topology = interchange.to_openmm_topology();
         // TODO might need some unit conversion / appending placehold positions
         // for v sites
-        let openmm_positions = self.pdb.as_ref().unwrap().positions;
-        self.modeller = Modeller::new(openmm_topology, openmm_positions);
+        let openmm_positions = self.pdb.as_ref().unwrap().positions.clone();
+        self.modeller = Some(Modeller::new(openmm_topology, openmm_positions));
 
         // build a topology and atom lists. BRW: why do we do this over and over
         // in different formats?
-        let top = self.modeller.get_topology();
+        let top = self.modeller.as_ref().unwrap().get_topology();
         let atoms = top.atoms();
 
         // TODO some weird atom_lists stuff in smirnoffio.py, skipping for now
-        for f in self.ff.fnms {
+        for f in &self.ff.fnms {
             std::fs::remove_file(f).unwrap();
         }
         todo!();
