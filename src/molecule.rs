@@ -1,5 +1,7 @@
 use std::{collections::HashMap, error::Error, path::Path, sync::LazyLock};
 
+use log::warn;
+
 use crate::{
     molecule::pdb::Pdb,
     utils::{np_max, np_min},
@@ -46,6 +48,33 @@ const RADII: [f64; 96] = [
     2.60, 2.21, 2.15, 2.06, 2.00, 1.96, 1.90, 1.87, 1.80, 1.69,
 ];
 
+// I have a partial implementation of networkx Graph in my msm crate, but I'm
+// holding off on pulling that in for now because I doubt we really need much
+// besides these Vecs. if I end up needing attributes or something more
+// involved, I can revisit this decision
+#[derive(Clone, Debug, PartialEq)]
+struct Graph {
+    nodes: Vec<usize>,
+    edges: Vec<(usize, usize)>,
+}
+
+impl Graph {
+    fn new() -> Self {
+        Self {
+            nodes: Vec::new(),
+            edges: Vec::new(),
+        }
+    }
+
+    fn add_node(&mut self, node: usize) {
+        self.nodes.push(node);
+    }
+
+    fn add_edge(&mut self, n1: usize, n2: usize) {
+        self.edges.push((n1, n2));
+    }
+}
+
 // TODO surely I need the xyzs from the .xyz file too. I expect we'll be reading
 // these files over and over in the future
 
@@ -62,6 +91,9 @@ pub(crate) struct Molecule {
 
     /// vector of bond connections. TODO comes from build_topology
     bonds: Vec<(usize, usize)>,
+
+    topology: Option<Graph>,
+    // molecules: Vec<Graph>,
 }
 
 impl Molecule {
@@ -93,6 +125,7 @@ impl Molecule {
             xyzs: Dmat::from_row_slice(rows, 3, &xyzs),
             elem: xyz.elem,
             bonds: Vec::new(),
+            topology: None,
         };
 
         ret.build_bonds();
@@ -108,6 +141,14 @@ impl Molecule {
             "given {path:?}, but I only know .pdb"
         );
         // in lined from Molecule.read_pdb
+        let mut ret = Self::read_pdb(path);
+
+        ret.build_topology();
+
+        ret
+    }
+
+    fn read_pdb(path: &Path) -> Molecule {
         let parsed_pdb = Pdb::load(path).unwrap();
 
         let mut pdblines = vec![vec![]];
@@ -214,7 +255,12 @@ impl Molecule {
         let xyzs = std::mem::take(&mut xyz_list[0]).into_iter().flatten();
         let xyzs = Dmat::from_row_iterator(rows, 3, xyzs);
 
-        Self { xyzs, elem, bonds }
+        Self {
+            xyzs,
+            elem,
+            bonds,
+            topology: None,
+        }
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -307,6 +353,45 @@ impl Molecule {
         // holy moly whyyy
         bond_list.dedup();
         self.bonds = bond_list;
+    }
+
+    /// Create self.topology and self.molecules; these are graph representations
+    /// of the individual molecules (fragments) contained in the molecule object
+    fn build_topology(&mut self) {
+        let force_bonds = false;
+        // taken from kwargs["topframe"] or self.top_settings["topframe"], but
+        // it ends up at 0 at least in the one case I'm stepping through
+        let sn = 0;
+        if self.len() > 100_000 {
+            warn!(
+                "{} atoms, topology building may take a long time",
+                self.len()
+            );
+        }
+        let mut g = Graph::new();
+        for (i, a) in self.elem.iter().enumerate() {
+            g.add_node(i);
+            // TODO do I really need attributes?
+            // g.set_node_attributes(i, a, "e");
+            // NOTE: supposed to be xyzs[sn][i] if I had multiple XYZs, but I
+            // thin I don't do that yet.
+            // g.set_node_attributes(i, self.xyzs[i].clone(), "x");
+        }
+
+        for (i, j) in &self.bonds {
+            g.add_edge(*i, *j);
+        }
+
+        // TODO might need to do this, but it looks identical to the topology
+        // right now
+
+        // let mut molecules = Vec::new();
+        // for c in g.connected_components() {
+        //     molecules.push(g.subgraph(c).clone());
+        // }
+        self.topology = Some(g);
+
+        // self.molecules = molecules;
     }
 }
 
