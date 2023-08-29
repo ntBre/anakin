@@ -257,6 +257,7 @@ impl Engine<Verlet> {
         // load mol2 files for smirnoff topology
         let mut openff_mols = Vec::new();
         for fnm in &self.mol2 {
+            let fnm = self.root.join(&self.target.tgtdir).join(fnm);
             openff_mols.push(OffMolecule::from_file(fnm));
         }
         self.off_topology = Some(OffTopology::from_openmm(
