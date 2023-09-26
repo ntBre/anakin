@@ -250,6 +250,15 @@ impl FF {
 
         assert_eq!(self.ffdata.len(), 1);
 
+        // TODO this isn't going to work at all. I'm editing these vectors
+        // returned by bonds(), angles() and propers_torsions() but I don't
+        // think these are actually mutating the underlying data like I want
+
+        // TODO also this isn't looping over inner like it's supposed to. I'm
+        // only grabbing the bond values... I think that's enough for today.
+        // When I come back, extract actual Rust structs that I have defined in
+        // openff-toolkit::smirnoff from Python and use those. add back in the
+        // as_hash methods
         let mut newffdata = self.ffdata.clone().pop().unwrap();
 
         // lookin pretty wet again
@@ -257,7 +266,8 @@ impl FF {
             if let Param::Opt { inner } = bond {
                 // assume the unit has not been changed
                 for (p, field, _unit) in inner {
-                    let mut field = &mut newffdata.bonds()[i];
+                    let mut bond = newffdata.bonds();
+                    let mut field = &mut bond[i];
                     field.value = pvals[*p];
                 }
             }
@@ -267,7 +277,8 @@ impl FF {
             if let Param::Opt { inner } = angle {
                 // assume the unit has not been changed
                 for (p, field, _unit) in inner {
-                    let mut field = &mut newffdata.angles()[i];
+                    let mut bond = newffdata.angles();
+                    let mut field = &mut bond[i];
                     field.value = pvals[*p];
                 }
             }
@@ -277,7 +288,8 @@ impl FF {
             if let Param::Opt { inner } = proper {
                 // assume the unit has not been changed
                 for (p, field, _unit) in inner {
-                    let mut field = &mut newffdata.proper_torsions()[i];
+                    let mut bond = newffdata.proper_torsions();
+                    let mut field = &mut bond[i];
                     field.value = pvals[*p];
                 }
             }
