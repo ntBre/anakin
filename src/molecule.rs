@@ -459,6 +459,7 @@ mod tests {
                 (6, 7), (6, 9), (7, 8), (7, 21), (8, 22), (9, 10), (9, 11),
                 (9, 12), (12, 13), (12, 23), (13, 24), (13, 25),
             ],
+            topology: None,
         };
         assert_eq!(got.xyzs, want.xyzs);
         assert_eq!(got.elem, want.elem);
