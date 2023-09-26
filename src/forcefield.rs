@@ -3,7 +3,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use openff_toolkit::smirnoff::{ForceField, Unit};
+use ligand::forcefield::ForceField;
+use openff_toolkit::smirnoff::Unit;
 
 use crate::{config::Config, utils::orthogonalize, Dmat, Dvec};
 
@@ -115,7 +116,7 @@ pub struct FF {
 #[derive(Clone, Debug)]
 enum Param {
     Opt {
-        inner: Vec<(usize, String, Unit)>,
+        inner: Vec<(usize, String, ligand::forcefield::Unit)>,
     },
     /// not being optimized, pass it along straight from the original force
     /// field
@@ -138,7 +139,7 @@ impl FF {
         for fnm in &fnms {
             offxml = Some(fnm.clone());
             let ff_file = &ffdir.join(fnm);
-            let ff = match ForceField::load(ff_file) {
+            let ff = match ForceField::new(ff_file.to_str().unwrap()) {
                 Ok(ff) => ff,
                 Err(e) => panic!("failed to open {ff_file:?} with {e}"),
             };
@@ -256,8 +257,7 @@ impl FF {
             if let Param::Opt { inner } = bond {
                 // assume the unit has not been changed
                 for (p, field, _unit) in inner {
-                    let mut field =
-                        newffdata.bonds[i].as_hash_mut(field).unwrap();
+                    let mut field = &mut newffdata.bonds()[i];
                     field.value = pvals[*p];
                 }
             }
@@ -267,8 +267,7 @@ impl FF {
             if let Param::Opt { inner } = angle {
                 // assume the unit has not been changed
                 for (p, field, _unit) in inner {
-                    let mut field =
-                        newffdata.angles[i].as_hash_mut(field).unwrap();
+                    let mut field = &mut newffdata.angles()[i];
                     field.value = pvals[*p];
                 }
             }
@@ -278,9 +277,7 @@ impl FF {
             if let Param::Opt { inner } = proper {
                 // assume the unit has not been changed
                 for (p, field, _unit) in inner {
-                    let mut field = newffdata.proper_torsions[i]
-                        .as_hash_mut(field)
-                        .unwrap();
+                    let mut field = &mut newffdata.proper_torsions()[i];
                     field.value = pvals[*p];
                 }
             }
@@ -288,7 +285,7 @@ impl FF {
 
         let fnm = self.fnms.first().unwrap();
         let path = dir.as_ref().join(fnm);
-        std::fs::write(path, newffdata.to_xml().unwrap()).unwrap();
+        std::fs::write(path, newffdata.to_xml()).unwrap();
 
         pvals
     }

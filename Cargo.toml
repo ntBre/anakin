@@ -13,7 +13,8 @@ env_logger = "0.10.0"
 log = "0.4.19"
 serde_json = "1.0.104"
 tempfile = "3.7.0"
-openff-toolkit = { path = "../openff-toolkit" }
+openff-toolkit = { path = "../openff-toolkit", features = ["rodeo", "openmm"]}
+ligand = { path = "../ligand" }
 openmm = { path = "/home/brent/Projects/openmm" }
 
 [dev-dependencies]

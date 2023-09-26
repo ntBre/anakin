@@ -3,15 +3,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use ligand::molecule::Molecule as OffMolecule;
+use ligand::molecule::Topology as OffTopology;
+use ligand::openmm::PDBFile;
+use ligand::openmm::{Integrator, Modeller, Platform, Simulation};
 use openff_toolkit::smirnoff::ForceField;
-use openff_toolkit::topology::molecule::Molecule as OffMolecule;
-use openff_toolkit::topology::Topology as OffTopology;
-use openmm::{
-    integrators::{Integrator, Verlet},
-    platform::Platform,
-    topology::Vec3,
-    Modeller, PDBFile, Simulation,
-};
 
 use crate::{
     forcefield::FF, molecule::Molecule, objective::Target,
@@ -21,12 +17,21 @@ use crate::{
 /// box for periodic boundary conditions
 struct PBox;
 
+struct Vec3 {
+    x: f64,
+    y: f64,
+    z: f64,
+}
+
+impl Vec3 {
+    fn new(x: f64, y: f64, z: f64) -> Self {
+        Self { x, y, z }
+    }
+}
+
 /// this corresponds to the SMIRNOFF class in ForceBalance, which is a subclass
 /// of OpenMM. basically it's just an interface to openmm
-pub(crate) struct Engine<I>
-where
-    I: Integrator,
-{
+pub(crate) struct Engine {
     valkwd: Vec<String>,
     name: String,
     target: Target,
@@ -37,7 +42,7 @@ where
     restraint_frc_index: Option<usize>,
 
     /// the actual simulation. initially none, set up later
-    simulation: Option<Simulation<I>>,
+    simulation: Option<Simulation>,
 
     /// initially empty, generated in prepare
     real_atom_idxs: Vec<usize>,
@@ -66,7 +71,7 @@ where
     modeller: Option<Modeller>,
 }
 
-impl Engine<Verlet> {
+impl Engine {
     /// initialization actually just seems to consist of setting up directories.
     /// not sure what options actually need to be stored at the moment. NOTE:
     /// target is supposed to be kwargs but we obviously don't have kwargs
@@ -224,9 +229,8 @@ impl Engine<Verlet> {
             .simulation
             .as_ref()
             .unwrap()
-            .context
-            .get_state(D::Positions)
-            .get_positions();
+            .context()
+            .get_coordinates();
 
         let x0 = positions
             .into_iter()
@@ -258,12 +262,10 @@ impl Engine<Verlet> {
         let mut openff_mols = Vec::new();
         for fnm in &self.mol2 {
             let fnm = self.root.join(&self.target.tgtdir).join(fnm);
-            openff_mols.push(OffMolecule::from_file(fnm));
+            openff_mols.push(OffMolecule::from_file(fnm).unwrap());
         }
-        self.off_topology = Some(OffTopology::from_openmm(
-            &self.pdb.as_ref().unwrap().topology,
-            openff_mols,
-        ));
+        let top = &self.pdb.as_ref().unwrap().topology();
+        self.off_topology = Some(OffTopology::from_openmm(top, openff_mols));
         self.restrain_k = 1.0;
         // TODO where did this come from?? I know it's from kwargs, but where
         // did it get determined
@@ -278,12 +280,13 @@ impl Engine<Verlet> {
 
         // Apply the FF parameters to the system. Currently this is the only way
         // to determine if the FF will apply virtual sites to the system.
-        let interchange = self
-            .ff
-            .openff_forcefield
-            .create_interchange(self.off_topology.as_ref().unwrap());
+        let top: ligand::molecule::Topology =
+            self.off_topology.as_ref().unwrap().clone();
+        let ff = &self.ff.openff_forcefield;
+        let interchange: ligand::forcefield::Interchange =
+            ff.create_interchange(top).unwrap();
 
-        self.has_virtual_sites = !interchange.virtual_sites.is_empty();
+        self.has_virtual_sites = !interchange.virtual_sites().is_empty();
 
         // handled by default
         // NOTE: no outer loop because I only have one xyz for now
@@ -297,7 +300,7 @@ impl Engine<Verlet> {
         let openmm_topology = interchange.to_openmm_topology();
         // TODO might need some unit conversion / appending placehold positions
         // for v sites
-        let openmm_positions = self.pdb.as_ref().unwrap().positions.clone();
+        let openmm_positions = self.pdb.as_ref().unwrap().positions().clone();
         self.modeller = Some(Modeller::new(openmm_topology, openmm_positions));
 
         // build a topology and atom lists. BRW: why do we do this over and over
