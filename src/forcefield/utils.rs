@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use openff_toolkit::smirnoff::ForceField;
+use ligand::forcefield::ForceField;
 
 use crate::{config::Config, forcefield::Param, Dvec};
 
@@ -18,11 +18,8 @@ pub(super) fn rsmake(
     for (i, param) in bonds_to_optimize.iter().enumerate() {
         if let Param::Opt { inner } = param {
             for (_, typ, _unit) in inner {
-                let val = openff_forcefield.as_ref().unwrap().bonds[i]
-                    .as_hash(typ)
-                    .unwrap()
-                    .value
-                    .abs();
+                let val =
+                    openff_forcefield.as_ref().unwrap().bonds()[i].value.abs();
                 let cur = max_bond.entry(typ.clone()).or_insert(val);
                 if val > *cur {
                     *cur = val;
@@ -35,11 +32,8 @@ pub(super) fn rsmake(
     for (i, param) in angles_to_optimize.iter().enumerate() {
         if let Param::Opt { inner } = param {
             for (_, typ, _unit) in inner {
-                let val = openff_forcefield.as_ref().unwrap().angles[i]
-                    .as_hash(typ)
-                    .unwrap()
-                    .value
-                    .abs();
+                let val =
+                    openff_forcefield.as_ref().unwrap().angles()[i].value.abs();
                 let cur = max_angle.entry(typ.clone()).or_insert(val);
                 if val > *cur {
                     *cur = val;
@@ -52,10 +46,8 @@ pub(super) fn rsmake(
     for (i, param) in propers_to_optimize.iter().enumerate() {
         if let Param::Opt { inner } = param {
             for (_, typ, _unit) in inner {
-                let val = openff_forcefield.as_ref().unwrap().proper_torsions
+                let val = openff_forcefield.as_ref().unwrap().proper_torsions()
                     [i]
-                    .as_hash(typ)
-                    .unwrap()
                     .value
                     .abs();
                 let cur = max_proper.entry(typ.clone()).or_insert(val);
@@ -132,11 +124,11 @@ pub(super) fn add_bonds(
     pvals0: &mut Vec<f64>,
     bonds_to_optimize: &mut Vec<Param>,
 ) {
-    for (i, bond) in (&ff.bonds).into_iter().enumerate() {
+    for (i, bond) in ff.bonds().iter().enumerate() {
         if let Some(to_optimize) = &bond.parameterize {
             let mut inner = Vec::new();
             for param in to_optimize.split(',').map(str::trim) {
-                let p = bond.as_hash(param).unwrap();
+                let p = bond;
                 inner.push((pvals0.len(), param.to_owned(), p.unit.clone()));
                 pvals0.push(p.value);
             }
@@ -152,11 +144,11 @@ pub(super) fn add_angles(
     pvals0: &mut Vec<f64>,
     angles_to_optimize: &mut Vec<Param>,
 ) {
-    for (i, angle) in (&ff.angles).into_iter().enumerate() {
+    for (i, angle) in ff.angles().iter().enumerate() {
         if let Some(to_optimize) = &angle.parameterize {
             let mut inner = Vec::new();
             for param in to_optimize.split(',').map(str::trim) {
-                let p = angle.as_hash(param).unwrap();
+                let p = angle;
                 inner.push((pvals0.len(), param.to_owned(), p.unit.clone()));
                 pvals0.push(p.value);
             }
@@ -172,11 +164,11 @@ pub(super) fn add_propers(
     pvals0: &mut Vec<f64>,
     propers_to_optimize: &mut Vec<Param>,
 ) {
-    for (i, proper) in (&ff.proper_torsions).into_iter().enumerate() {
+    for (i, proper) in ff.proper_torsions().iter().enumerate() {
         if let Some(to_optimize) = &proper.parameterize {
             let mut inner = Vec::new();
             for param in to_optimize.split(',').map(str::trim) {
-                let p = proper.as_hash(param).unwrap();
+                let p = proper;
                 inner.push((pvals0.len(), param.to_owned(), p.unit.clone()));
                 pvals0.push(p.value);
             }

@@ -218,20 +218,21 @@ impl Molecule {
                 };
                 new_xyz.push([*x, *y, *z]);
             }
-            if xyz_list.len() == 0 {
+            if xyz_list.is_empty() {
                 xyz_list.push(new_xyz);
-            } else if xyz_list.len() >= 1 {
+            } else {
                 // supposed to check that the shape of new_xyz matches the
                 // last element of xyz_list, but I'm only going to have one
                 // of these anyway
+                assert_eq!(new_xyz.len(), xyz_list.last().unwrap().len());
                 xyz_list.push(new_xyz);
             }
         }
 
         // build a list of chemical elements
         let mut elem = Vec::new();
-        for i in 0..atom_names.len() {
-            let Record::Atom { element, .. } = &x[i] else {
+        for i in x.iter().take(atom_names.len()) {
+            let Record::Atom { element, .. } = i else {
                 continue;
             };
             elem.push(element.clone());
@@ -239,15 +240,12 @@ impl Molecule {
 
         let mut bonds = Vec::new();
         for record in &parsed_pdb.records {
-            match record {
-                Record::Conect { atoms } => {
-                    let mut atoms = atoms.iter();
-                    let a = atoms.next().unwrap();
-                    for b in atoms {
-                        bonds.push((a.min(b) - 1, a.max(b) - 1));
-                    }
+            if let Record::Conect { atoms } = record {
+                let mut atoms = atoms.iter();
+                let a = atoms.next().unwrap();
+                for b in atoms {
+                    bonds.push((a.min(b) - 1, a.max(b) - 1));
                 }
-                _ => {}
             }
         }
 

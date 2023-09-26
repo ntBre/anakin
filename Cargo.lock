@@ -32,6 +32,7 @@ version = "0.1.0"
 dependencies = [
  "approx",
  "env_logger",
+ "ligand",
  "log",
  "nalgebra",
  "openff-toolkit",
