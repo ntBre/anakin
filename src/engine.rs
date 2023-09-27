@@ -308,8 +308,9 @@ impl Engine<Verlet> {
 
         // TODO some weird atom_lists stuff in smirnoffio.py, skipping for now
         for f in &self.ff.fnms {
-            std::fs::remove_file(f).unwrap();
+            let path = self.root.join(&self.tempdir).join(f);
+            std::fs::remove_file(path)
+                .unwrap_or_else(|e| panic!("failed to remove {f} with {e}"));
         }
-        todo!();
     }
 }
