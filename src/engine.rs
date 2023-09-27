@@ -260,10 +260,10 @@ impl Engine<Verlet> {
             let fnm = self.root.join(&self.target.tgtdir).join(fnm);
             openff_mols.push(OffMolecule::from_file(fnm));
         }
-        self.off_topology = Some(OffTopology::from_openmm(
-            &self.pdb.as_ref().unwrap().topology,
-            openff_mols,
-        ));
+        // self.off_topology = Some(OffTopology::from_openmm(
+        //     &self.pdb.as_ref().unwrap().topology,
+        //     openff_mols,
+        // ));
         self.restrain_k = 1.0;
         // TODO where did this come from?? I know it's from kwargs, but where
         // did it get determined
@@ -278,12 +278,12 @@ impl Engine<Verlet> {
 
         // Apply the FF parameters to the system. Currently this is the only way
         // to determine if the FF will apply virtual sites to the system.
-        let interchange = self
-            .ff
-            .openff_forcefield
-            .create_interchange(self.off_topology.as_ref().unwrap());
+        // let interchange = self
+        //     .ff
+        //     .openff_forcefield
+        //     .create_interchange(self.off_topology.as_ref().unwrap());
 
-        self.has_virtual_sites = !interchange.virtual_sites.is_empty();
+        // self.has_virtual_sites = !interchange.virtual_sites.is_empty();
 
         // handled by default
         // NOTE: no outer loop because I only have one xyz for now
@@ -294,10 +294,11 @@ impl Engine<Verlet> {
         }
         // TODO if I support pbc, obtain the box here
         self.xyz_omms.push((xyz_omm, None));
-        let openmm_topology = interchange.to_openmm_topology();
+        // let openmm_topology = interchange.to_openmm_topology();
         // TODO might need some unit conversion / appending placehold positions
         // for v sites
         let openmm_positions = self.pdb.as_ref().unwrap().positions.clone();
+        let openmm_topology = self.pdb.as_ref().unwrap().topology.clone();
         self.modeller = Some(Modeller::new(openmm_topology, openmm_positions));
 
         // build a topology and atom lists. BRW: why do we do this over and over
