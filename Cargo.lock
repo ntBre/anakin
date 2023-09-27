@@ -758,6 +758,7 @@ name = "openff-toolkit"
 version = "0.1.0"
 dependencies = [
  "ligand",
+ "openmm",
  "pyo3",
  "quick-xml",
  "reqwest",
