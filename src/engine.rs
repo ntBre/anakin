@@ -9,6 +9,7 @@ use openff_toolkit::topology::Topology as OffTopology;
 use openmm::{
     integrators::{Integrator, Verlet},
     platform::Platform,
+    system::System,
     topology::Vec3,
     Modeller, PDBFile, Simulation,
 };
@@ -71,13 +72,18 @@ impl Engine<Verlet> {
     /// not sure what options actually need to be stored at the moment. NOTE:
     /// target is supposed to be kwargs but we obviously don't have kwargs
     pub(crate) fn new(target: Target) -> Self {
-        // let pdb = PDBFile::new("testfiles/test.pdb");
-        // let mut m = Modeller::new(pdb.topology, pdb.positions);
-        // let ff = ForceField::load("testfiles/force-field.offxml").unwrap();
-        // let topology = m.topology;
-        // let system = ff.create_system(topology);
-        // let integrator = Verlet::new(1.0);
-        // let simulation = Simulation::new(topology, system, integrator);
+        let pdb = PDBFile::new("testfiles/test.pdb");
+        let mut m = Modeller::new(pdb.topology, pdb.positions);
+        let ff = ForceField::load("testfiles/force-field.offxml").unwrap();
+        let topology = m.topology;
+        // TODO crashing here because "Cannot create a context for a System with
+        // no particles," suggesting that ff.create_system is the important
+        // place to fix this
+
+        // TODO this is supposed to be an OFF topology
+        let system = ff.create_system(topology.clone());
+        let integrator = Verlet::new(1.0);
+        let simulation = Simulation::new(topology, system, integrator);
         let mut ret = Self {
             restraint_frc_index: None,
             simulation: None,
@@ -198,7 +204,11 @@ impl Engine<Verlet> {
     /// geometry. `shot` is the snapshot number to be minimized, presumably
     /// `align` handles the "and align ..." part if set to `true`. returns the
     /// energy, the rmsd in Angstrom, and a third value to be determined
-    pub(crate) fn optimize(&self, shot: usize, align: bool) -> (f64, f64, f64) {
+    pub(crate) fn optimize(
+        &mut self,
+        shot: usize,
+        align: bool,
+    ) -> (f64, f64, f64) {
         // optional argument in Python, this is the default value
         const CRIT: f64 = 1e-4;
         // TODO if crit stays a constant, steps is also a constant 4 lol
@@ -238,7 +248,10 @@ impl Engine<Verlet> {
     /// create the simulation object, or update the force field parameters in
     /// the existing simulation object. this should be run when we write a new
     /// force field XML file.
-    fn update_simulation(&self) {
+    fn update_simulation(&mut self) {
+        if let Some(sim) = &mut self.simulation {
+            update_simulation_parameters(sim);
+        }
         todo!()
     }
 
@@ -313,4 +326,9 @@ impl Engine<Verlet> {
                 .unwrap_or_else(|e| panic!("failed to remove {f} with {e}"));
         }
     }
+}
+
+fn update_simulation_parameters(sim: &mut Simulation<Verlet>) {
+    dbg!("in sim params");
+    todo!()
 }

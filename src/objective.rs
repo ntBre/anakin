@@ -261,7 +261,7 @@ impl Target {
                 let mut emms = Vec::new();
                 let mut rmsds = Vec::new();
                 // we only support OpenMM as an engine for now
-                let engine = Engine::new(self.clone());
+                let mut engine = Engine::new(self.clone());
                 for i in 0..*ns {
                     let (energy, rmsd, m_opt) = engine.optimize(i, false);
                     emms.push(energy);
