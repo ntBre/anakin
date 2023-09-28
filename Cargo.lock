@@ -764,6 +764,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "torx",
 ]
 
 [[package]]
@@ -772,6 +773,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.3.3",
  "openmm-sys",
+ "torx",
  "xmltree",
 ]
 
@@ -1402,6 +1404,10 @@ dependencies = [
  "toml_datetime",
  "winnow",
 ]
+
+[[package]]
+name = "torx"
+version = "0.1.0"
 
 [[package]]
 name = "tower-service"

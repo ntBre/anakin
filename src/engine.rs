@@ -6,12 +6,14 @@ use std::{
 use openff_toolkit::smirnoff::ForceField;
 use openff_toolkit::topology::molecule::Molecule as OffMolecule;
 use openff_toolkit::topology::Topology as OffTopology;
+use openmm::pdb::modeller::Modeller;
+use openmm::pdb::PDBFile;
 use openmm::{
     integrators::{Integrator, Verlet},
     platform::Platform,
     system::System,
     topology::Vec3,
-    Modeller, PDBFile, Simulation,
+    Simulation,
 };
 
 use crate::{
@@ -65,6 +67,7 @@ where
     has_virtual_sites: bool,
     xyz_omms: Vec<(Vec<Vec3>, Option<PBox>)>,
     modeller: Option<Modeller>,
+    system: Option<System>,
 }
 
 impl Engine<Verlet> {
@@ -75,15 +78,15 @@ impl Engine<Verlet> {
         let pdb = PDBFile::new("testfiles/test.pdb");
         let mut m = Modeller::new(pdb.topology, pdb.positions);
         let ff = ForceField::load("testfiles/force-field.offxml").unwrap();
-        let topology = m.topology;
+        // let topology = m.topology;
         // TODO crashing here because "Cannot create a context for a System with
         // no particles," suggesting that ff.create_system is the important
         // place to fix this
 
         // TODO this is supposed to be an OFF topology
-        let system = ff.create_system(topology.clone());
-        let integrator = Verlet::new(1.0);
-        let simulation = Simulation::new(topology, system, integrator);
+        // let system = ff.create_system(topology.clone());
+        // let integrator = Verlet::new(1.0);
+        // let simulation = Simulation::new(topology, system, integrator);
         let mut ret = Self {
             restraint_frc_index: None,
             simulation: None,
@@ -132,6 +135,7 @@ impl Engine<Verlet> {
             has_virtual_sites: false,
             xyz_omms: Vec::new(),
             modeller: None,
+            system: None,
         };
         // Step 1: set up options
         ret.set_opts();
@@ -249,10 +253,16 @@ impl Engine<Verlet> {
     /// the existing simulation object. this should be run when we write a new
     /// force field XML file.
     fn update_simulation(&mut self) {
+        let system = self
+            .ff
+            .openff_forcefield
+            .create_system(self.off_topology.clone().unwrap());
+        self.system = Some(system);
         if let Some(sim) = &mut self.simulation {
             update_simulation_parameters(sim);
+        } else {
+            self.create_simulation()
         }
-        todo!()
     }
 
     fn set_positions(&self, shot: usize) {
@@ -265,7 +275,8 @@ impl Engine<Verlet> {
     /// calling ForceField from the OpenFF toolkit and ignoring AMOEBA stuff.
     fn prepare(&mut self) {
         if let Some(pdb) = &self.abspdb {
-            self.pdb = Some(PDBFile::new(pdb));
+            let pdb = PDBFile::new(pdb);
+            self.pdb = Some(pdb);
         }
         // load mol2 files for smirnoff topology
         let mut openff_mols = Vec::new();
@@ -273,10 +284,10 @@ impl Engine<Verlet> {
             let fnm = self.root.join(&self.target.tgtdir).join(fnm);
             openff_mols.push(OffMolecule::from_file(fnm));
         }
-        // self.off_topology = Some(OffTopology::from_openmm(
-        //     &self.pdb.as_ref().unwrap().topology,
-        //     openff_mols,
-        // ));
+        self.off_topology = Some(OffTopology::from_openmm(
+            &self.pdb.as_ref().unwrap().topology,
+            openff_mols,
+        ));
         self.restrain_k = 1.0;
         // TODO where did this come from?? I know it's from kwargs, but where
         // did it get determined
@@ -291,12 +302,12 @@ impl Engine<Verlet> {
 
         // Apply the FF parameters to the system. Currently this is the only way
         // to determine if the FF will apply virtual sites to the system.
-        // let interchange = self
-        //     .ff
-        //     .openff_forcefield
-        //     .create_interchange(self.off_topology.as_ref().unwrap());
+        let interchange = self
+            .ff
+            .openff_forcefield
+            .create_interchange(self.off_topology.as_ref().unwrap().clone());
 
-        // self.has_virtual_sites = !interchange.virtual_sites.is_empty();
+        self.has_virtual_sites = !interchange.virtual_sites.is_empty();
 
         // handled by default
         // NOTE: no outer loop because I only have one xyz for now
@@ -325,6 +336,14 @@ impl Engine<Verlet> {
             std::fs::remove_file(path)
                 .unwrap_or_else(|e| panic!("failed to remove {f} with {e}"));
         }
+    }
+
+    fn create_simulation(&mut self) {
+        let top = self.modeller.clone().unwrap().topology;
+        let sys = self.system.clone().unwrap();
+        let int = Verlet::new(1.0);
+        let simulation = Simulation::new(top, sys, int);
+        self.simulation = Some(simulation);
     }
 }
 
