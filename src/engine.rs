@@ -3,6 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use log::debug;
 use openff_toolkit::smirnoff::ForceField;
 use openff_toolkit::topology::molecule::Molecule as OffMolecule;
 use openff_toolkit::topology::Topology as OffTopology;
@@ -83,6 +84,7 @@ impl Engine<Verlet> {
         // no particles," suggesting that ff.create_system is the important
         // place to fix this
 
+        debug!("creating engine");
         // TODO this is supposed to be an OFF topology
         // let system = ff.create_system(topology.clone());
         // let integrator = Verlet::new(1.0);
@@ -163,6 +165,9 @@ impl Engine<Verlet> {
         ret.read_src(&pdb.clone(), mol.clone(), vec![mol2.clone()]);
         // Step 3: Prepare the temporary directory
         ret.prepare();
+
+        debug!("finished creating engine");
+
         ret
     }
 
@@ -253,16 +258,20 @@ impl Engine<Verlet> {
     /// the existing simulation object. this should be run when we write a new
     /// force field XML file.
     fn update_simulation(&mut self) {
+        debug!("updating simulation");
         let system = self
             .ff
             .openff_forcefield
             .create_system(self.off_topology.clone().unwrap());
+        debug!("created system");
         self.system = Some(system);
         if let Some(sim) = &mut self.simulation {
             update_simulation_parameters(sim);
         } else {
+            debug!("creating simulation");
             self.create_simulation()
         }
+        debug!("finished updating simulation");
     }
 
     fn set_positions(&self, shot: usize) {
